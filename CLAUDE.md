@@ -107,7 +107,7 @@ python app.py
 radiology_worklog/
 ├── app.py                  ← 메인 Flask 앱 (라우트 및 DB 로직)
 ├── requirements.txt        ← 패키지 목록
-├── README.md               ← 이 파일
+├── README.md               ← 프로젝트 문서
 ├── CLAUDE.md               ← Claude Code 프로젝트 문서 (README와 동기화)
 ├── instance/
 │   └── worklog.db         ← SQLite DB (자동 생성)
