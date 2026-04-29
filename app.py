@@ -117,6 +117,13 @@ def init_db():
     )''')
 
     # 연장근무 현황
+    c.execute('''CREATE TABLE IF NOT EXISTS worklog_status (
+        date TEXT PRIMARY KEY,
+        status TEXT DEFAULT '반려',
+        rejected_by TEXT,
+        rejected_at TEXT DEFAULT (datetime('now','localtime'))
+    )''')
+
     c.execute('''CREATE TABLE IF NOT EXISTS overtime (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         date TEXT NOT NULL,
@@ -128,6 +135,16 @@ def init_db():
         approved_by TEXT,
         created_at TEXT DEFAULT (datetime('now','localtime'))
     )''')
+
+    # oncall 시간 컬럼 마이그레이션 (기존 DB 호환)
+    try:
+        c.execute("ALTER TABLE oncall ADD COLUMN start_time TEXT DEFAULT ''")
+    except Exception:
+        pass
+    try:
+        c.execute("ALTER TABLE oncall ADD COLUMN end_time TEXT DEFAULT ''")
+    except Exception:
+        pass
 
     # 기본 관리자 계정 생성 (admin / admin1234)
     hashed = hashlib.sha256('admin1234'.encode()).hexdigest()
@@ -587,6 +604,18 @@ def write_roster_add():
     conn.commit(); conn.close()
     return redirect(url_for('write', date=d))
 
+@app.route('/write/roster/edit/<int:id>', methods=['POST'])
+@login_required
+def write_roster_edit(id):
+    conn = get_db()
+    r = conn.execute("SELECT date FROM staff_roster WHERE id=?", (id,)).fetchone()
+    d = r['date'] if r else date.today().isoformat()
+    conn.execute("UPDATE staff_roster SET shift=?,staff_name=?,role=?,note=? WHERE id=?",
+        (request.form['shift'], request.form['staff_name'],
+         request.form.get('role',''), request.form.get('note',''), id))
+    conn.commit(); conn.close()
+    return redirect(url_for('write', date=d))
+
 @app.route('/write/roster/delete/<int:id>')
 @login_required
 def write_roster_delete(id):
@@ -601,13 +630,23 @@ def write_roster_delete(id):
 @login_required
 def write_vacation_add():
     d = request.form['date']
+    start = request.form['start_date']
     conn = get_db()
     conn.execute("INSERT INTO vacation (staff_name,vacation_type,start_date,end_date,days,reason,status) VALUES (?,?,?,?,?,?,?)",
         (request.form['staff_name'], request.form['vacation_type'],
-         request.form['start_date'], request.form['end_date'],
-         float(request.form.get('days',1)), request.form.get('reason',''), request.form.get('status','승인')))
+         start, start, 1, '', '승인'))
     conn.commit(); conn.close()
     return redirect(url_for('write', date=d))
+
+@app.route('/write/vacation/edit/<int:id>', methods=['POST'])
+@login_required
+def write_vacation_edit(id):
+    start = request.form['start_date']
+    conn = get_db()
+    conn.execute("UPDATE vacation SET staff_name=?,vacation_type=?,start_date=?,end_date=? WHERE id=?",
+        (request.form['staff_name'], request.form['vacation_type'], start, start, id))
+    conn.commit(); conn.close()
+    return redirect(url_for('write', date=start))
 
 @app.route('/write/vacation/delete/<int:id>')
 @login_required
@@ -624,9 +663,23 @@ def write_vacation_delete(id):
 def write_oncall_add():
     d = request.form['date']
     conn = get_db()
-    conn.execute("INSERT INTO oncall (date,staff_name,modality,phone,note) VALUES (?,?,?,?,?)",
+    conn.execute("INSERT INTO oncall (date,staff_name,modality,phone,note,start_time,end_time) VALUES (?,?,?,?,?,?,?)",
         (d, request.form['staff_name'], request.form['modality'],
-         request.form.get('phone',''), request.form.get('note','')))
+         '', request.form.get('note',''),
+         request.form.get('start_time',''), request.form.get('end_time','')))
+    conn.commit(); conn.close()
+    return redirect(url_for('write', date=d))
+
+@app.route('/write/oncall/edit/<int:id>', methods=['POST'])
+@login_required
+def write_oncall_edit(id):
+    conn = get_db()
+    r = conn.execute("SELECT date FROM oncall WHERE id=?", (id,)).fetchone()
+    d = r['date'] if r else date.today().isoformat()
+    conn.execute("UPDATE oncall SET staff_name=?,modality=?,note=?,start_time=?,end_time=? WHERE id=?",
+        (request.form['staff_name'], request.form['modality'],
+         request.form.get('note',''),
+         request.form.get('start_time',''), request.form.get('end_time',''), id))
     conn.commit(); conn.close()
     return redirect(url_for('write', date=d))
 
@@ -651,7 +704,23 @@ def write_overtime_add():
         h = 0
     conn = get_db()
     conn.execute("INSERT INTO overtime (date,staff_name,start_time,end_time,hours,reason,approved_by) VALUES (?,?,?,?,?,?,?)",
-        (d, request.form['staff_name'], st, et, h, request.form['reason'], request.form.get('approved_by','')))
+        (d, request.form['staff_name'], st, et, h, request.form['reason'], ''))
+    conn.commit(); conn.close()
+    return redirect(url_for('write', date=d))
+
+@app.route('/write/overtime/edit/<int:id>', methods=['POST'])
+@login_required
+def write_overtime_edit(id):
+    conn = get_db()
+    r = conn.execute("SELECT date FROM overtime WHERE id=?", (id,)).fetchone()
+    d = r['date'] if r else date.today().isoformat()
+    st = request.form['start_time']; et = request.form['end_time']
+    try:
+        h = round((datetime.strptime(et,'%H:%M') - datetime.strptime(st,'%H:%M')).seconds / 3600, 1)
+    except:
+        h = 0
+    conn.execute("UPDATE overtime SET staff_name=?,start_time=?,end_time=?,hours=?,reason=? WHERE id=?",
+        (request.form['staff_name'], st, et, h, request.form['reason'], id))
     conn.commit(); conn.close()
     return redirect(url_for('write', date=d))
 
@@ -676,6 +745,19 @@ def write_equipment_add():
     conn.commit(); conn.close()
     return redirect(url_for('write', date=d))
 
+@app.route('/write/equipment/edit/<int:id>', methods=['POST'])
+@login_required
+def write_equipment_edit(id):
+    conn = get_db()
+    r = conn.execute("SELECT date FROM equipment_log WHERE id=?", (id,)).fetchone()
+    d = r['date'] if r else date.today().isoformat()
+    conn.execute("UPDATE equipment_log SET equipment=?,log_type=?,description=?,engineer=?,downtime_hours=?,status=? WHERE id=?",
+        (request.form['equipment'], request.form['log_type'], request.form['description'],
+         request.form.get('engineer',''), float(request.form.get('downtime_hours',0) or 0),
+         request.form['status'], id))
+    conn.commit(); conn.close()
+    return redirect(url_for('write', date=d))
+
 @app.route('/write/equipment/delete/<int:id>')
 @login_required
 def write_equipment_delete(id):
@@ -694,6 +776,18 @@ def write_handover_add():
     conn.execute("INSERT INTO handover (date,shift,from_person,to_person,content,priority) VALUES (?,?,?,?,?,?)",
         (d, request.form['shift'], request.form['from_person'],
          request.form['to_person'], request.form['content'], request.form.get('priority','일반')))
+    conn.commit(); conn.close()
+    return redirect(url_for('write', date=d))
+
+@app.route('/write/handover/edit/<int:id>', methods=['POST'])
+@login_required
+def write_handover_edit(id):
+    conn = get_db()
+    r = conn.execute("SELECT date FROM handover WHERE id=?", (id,)).fetchone()
+    d = r['date'] if r else date.today().isoformat()
+    conn.execute("UPDATE handover SET shift=?,from_person=?,to_person=?,content=?,priority=? WHERE id=?",
+        (request.form['shift'], request.form['from_person'], request.form['to_person'],
+         request.form['content'], request.form.get('priority','일반'), id))
     conn.commit(); conn.close()
     return redirect(url_for('write', date=d))
 
@@ -716,6 +810,18 @@ def write_issue_add():
         (d, request.form['category'], request.form['severity'],
          request.form['title'], request.form['content'],
          request.form.get('status','진행중'), session['name']))
+    conn.commit(); conn.close()
+    return redirect(url_for('write', date=d))
+
+@app.route('/write/issue/edit/<int:id>', methods=['POST'])
+@login_required
+def write_issue_edit(id):
+    conn = get_db()
+    r = conn.execute("SELECT date FROM issues WHERE id=?", (id,)).fetchone()
+    d = r['date'] if r else date.today().isoformat()
+    conn.execute("UPDATE issues SET category=?,severity=?,title=?,content=?,status=? WHERE id=?",
+        (request.form['category'], request.form['severity'],
+         request.form['title'], request.form['content'], request.form['status'], id))
     conn.commit(); conn.close()
     return redirect(url_for('write', date=d))
 
@@ -762,6 +868,7 @@ def worklog_list():
     logs = []
     for d in dates:
         vac_rows = conn.execute("SELECT COUNT(*) as c FROM vacation WHERE start_date<=? AND end_date>=?", (d,d)).fetchone()['c']
+        ws = conn.execute("SELECT status, rejected_by FROM worklog_status WHERE date=?", (d,)).fetchone()
         logs.append({
             'date':      d,
             'roster':    conn.execute("SELECT COUNT(*) as c FROM staff_roster WHERE date=?",   (d,)).fetchone()['c'],
@@ -771,9 +878,38 @@ def worklog_list():
             'equipment': conn.execute("SELECT COUNT(*) as c FROM equipment_log WHERE date=?",  (d,)).fetchone()['c'],
             'handover':  conn.execute("SELECT COUNT(*) as c FROM handover WHERE date=?",       (d,)).fetchone()['c'],
             'issues':    conn.execute("SELECT COUNT(*) as c FROM issues WHERE date=?",         (d,)).fetchone()['c'],
+            'rejected':  ws is not None,
+            'rejected_by': ws['rejected_by'] if ws else '',
         })
     conn.close()
     return render_template('worklog_list.html', logs=logs)
+
+# ════════════════════════════════════════════════════
+# 업무일지 반려
+# ════════════════════════════════════════════════════
+@app.route('/worklog/reject/<date_str>')
+@login_required
+def worklog_reject(date_str):
+    if session.get('role') != 'admin':
+        flash('관리자만 반려할 수 있습니다.', 'danger')
+        return redirect(url_for('worklog_list'))
+    conn = get_db()
+    conn.execute("INSERT OR REPLACE INTO worklog_status (date, status, rejected_by) VALUES (?, '반려', ?)",
+        (date_str, session['name']))
+    conn.commit(); conn.close()
+    flash(f'{date_str} 업무일지가 반려되었습니다.', 'warning')
+    return redirect(url_for('worklog_list'))
+
+@app.route('/worklog/unreject/<date_str>')
+@login_required
+def worklog_unreject(date_str):
+    if session.get('role') != 'admin':
+        return redirect(url_for('worklog_list'))
+    conn = get_db()
+    conn.execute("DELETE FROM worklog_status WHERE date=?", (date_str,))
+    conn.commit(); conn.close()
+    flash(f'{date_str} 반려가 취소되었습니다.', 'success')
+    return redirect(url_for('worklog_list'))
 
 # ════════════════════════════════════════════════════
 # 인쇄 뷰
