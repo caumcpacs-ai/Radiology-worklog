@@ -215,24 +215,33 @@ def logout():
 def dashboard():
     today = date.today().isoformat()
     conn = get_db()
-    # 오늘 이슈 수
-    issues_today = conn.execute("SELECT COUNT(*) as cnt FROM issues WHERE date=?", (today,)).fetchone()['cnt']
-    # 미해결 이슈
-    issues_open = conn.execute("SELECT COUNT(*) as cnt FROM issues WHERE status='진행중'", ).fetchone()['cnt']
-    # 오늘 인수인계
-    handover_today = conn.execute("SELECT COUNT(*) as cnt FROM handover WHERE date=?", (today,)).fetchone()['cnt']
-    # 장비 처리중
-    equip_active = conn.execute("SELECT COUNT(*) as cnt FROM equipment_log WHERE status='처리중'", ).fetchone()['cnt']
-    # 이번 주 휴가
     week_start = (date.today() - timedelta(days=date.today().weekday())).isoformat()
-    week_end = (date.today() + timedelta(days=6 - date.today().weekday())).isoformat()
-    vacation_week = conn.execute("SELECT COUNT(*) as cnt FROM vacation WHERE start_date<=? AND end_date>=? AND status='승인'",
+    week_end   = (date.today() + timedelta(days=6 - date.today().weekday())).isoformat()
+
+    # KPI 카운트
+    issues_open   = conn.execute("SELECT COUNT(*) as cnt FROM issues WHERE status='진행중'").fetchone()['cnt']
+    issues_today  = conn.execute("SELECT COUNT(*) as cnt FROM issues WHERE date=?", (today,)).fetchone()['cnt']
+    handover_today= conn.execute("SELECT COUNT(*) as cnt FROM handover WHERE date=?", (today,)).fetchone()['cnt']
+    equip_active  = conn.execute("SELECT COUNT(*) as cnt FROM equipment_log WHERE status='처리중'").fetchone()['cnt']
+    vacation_week = conn.execute("SELECT COUNT(*) as cnt FROM vacation WHERE start_date<=? AND end_date>=?",
                                  (week_end, week_start)).fetchone()['cnt']
-    # 오늘 oncall
-    oncall_today = conn.execute("SELECT * FROM oncall WHERE date=? ORDER BY modality", (today,)).fetchall()
-    # 최근 이슈 5건
-    recent_issues = conn.execute("SELECT * FROM issues ORDER BY created_at DESC LIMIT 5").fetchall()
-    # 최근 인수인계 3건
+    oncall_today  = conn.execute("SELECT * FROM oncall WHERE date=? ORDER BY modality", (today,)).fetchall()
+
+    # KPI 툴팁용 상세 목록
+    issues_open_rows   = conn.execute("SELECT * FROM issues WHERE status='진행중' ORDER BY severity, date DESC LIMIT 10").fetchall()
+    issues_today_rows  = conn.execute("SELECT * FROM issues WHERE date=? ORDER BY severity", (today,)).fetchall()
+    handover_today_rows= conn.execute("SELECT * FROM handover WHERE date=? ORDER BY shift, id", (today,)).fetchall()
+    equip_active_rows  = conn.execute("SELECT * FROM equipment_log WHERE status='처리중' ORDER BY date DESC LIMIT 10").fetchall()
+    vacation_week_rows = conn.execute("SELECT * FROM vacation WHERE start_date<=? AND end_date>=? ORDER BY start_date",
+                                      (week_end, week_start)).fetchall()
+
+    # 오늘 근무자·휴가 현황
+    roster_today   = conn.execute("SELECT * FROM staff_roster WHERE date=? ORDER BY shift, id", (today,)).fetchall()
+    vacation_today = conn.execute("SELECT * FROM vacation WHERE start_date<=? AND end_date>=? ORDER BY staff_name",
+                                  (today, today)).fetchall()
+
+    # 최근 이슈·인수인계
+    recent_issues   = conn.execute("SELECT * FROM issues ORDER BY created_at DESC LIMIT 5").fetchall()
     recent_handover = conn.execute("SELECT * FROM handover ORDER BY created_at DESC LIMIT 3").fetchall()
     conn.close()
     return render_template('dashboard.html',
@@ -240,6 +249,10 @@ def dashboard():
         issues_today=issues_today, issues_open=issues_open,
         handover_today=handover_today, equip_active=equip_active,
         vacation_week=vacation_week, oncall_today=oncall_today,
+        issues_open_rows=issues_open_rows, issues_today_rows=issues_today_rows,
+        handover_today_rows=handover_today_rows, equip_active_rows=equip_active_rows,
+        vacation_week_rows=vacation_week_rows,
+        roster_today=roster_today, vacation_today=vacation_today,
         recent_issues=recent_issues, recent_handover=recent_handover)
 
 # ════════════════════════════════════════════════════
