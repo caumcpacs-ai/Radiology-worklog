@@ -116,12 +116,15 @@ def init_db():
         created_at TEXT DEFAULT (datetime('now','localtime'))
     )''')
 
-    # 연장근무 현황
+    # 업무일지 상태 (제출/반려)
     c.execute('''CREATE TABLE IF NOT EXISTS worklog_status (
         date TEXT PRIMARY KEY,
-        status TEXT DEFAULT '반려',
-        rejected_by TEXT,
-        rejected_at TEXT DEFAULT (datetime('now','localtime'))
+        status TEXT DEFAULT '제출',
+        submitted_by TEXT DEFAULT '',
+        submitted_at TEXT DEFAULT '',
+        rejected_by TEXT DEFAULT '',
+        rejected_to TEXT DEFAULT '',
+        rejected_at TEXT DEFAULT ''
     )''')
 
     c.execute('''CREATE TABLE IF NOT EXISTS overtime (
@@ -143,6 +146,17 @@ def init_db():
         pass
     try:
         c.execute("ALTER TABLE oncall ADD COLUMN end_time TEXT DEFAULT ''")
+    except Exception:
+        pass
+
+    # worklog_status 컬럼 마이그레이션 (기존 DB 호환)
+    for col in ['submitted_by', 'submitted_at', 'rejected_to']:
+        try:
+            c.execute(f"ALTER TABLE worklog_status ADD COLUMN {col} TEXT DEFAULT ''")
+        except Exception:
+            pass
+    try:
+        c.execute("ALTER TABLE worklog_status ADD COLUMN rejected_at TEXT DEFAULT ''")
     except Exception:
         pass
 
@@ -580,6 +594,7 @@ def user_delete(id):
 def write():
     sel = request.args.get('date', date.today().isoformat())
     conn = get_db()
+    ws = conn.execute("SELECT status, submitted_by FROM worklog_status WHERE date=?", (sel,)).fetchone()
     data = {
         'roster':    conn.execute("SELECT * FROM staff_roster   WHERE date=? ORDER BY shift, id", (sel,)).fetchall(),
         'vacation':  conn.execute("SELECT * FROM vacation        WHERE start_date<=? AND end_date>=? ORDER BY staff_name", (sel, sel)).fetchall(),
@@ -590,7 +605,8 @@ def write():
         'issues':    conn.execute("SELECT * FROM issues          WHERE date=? ORDER BY severity, id", (sel,)).fetchall(),
     }
     conn.close()
-    return render_template('write.html', sel=sel, **data)
+    wl_status = ws['status'] if ws else None
+    return render_template('write.html', sel=sel, wl_status=wl_status, **data)
 
 # 작성 페이지 전용 POST 라우트 (저장 후 /write?date=... 로 복귀)
 @app.route('/write/roster/add', methods=['POST'])
@@ -851,51 +867,82 @@ def write_issue_delete(id):
     return redirect(url_for('write', date=d))
 
 # ════════════════════════════════════════════════════
+# 업무일지 제출
+# ════════════════════════════════════════════════════
+@app.route('/worklog/submit/<date_str>', methods=['POST'])
+@login_required
+def worklog_submit(date_str):
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    conn = get_db()
+    conn.execute("""INSERT OR REPLACE INTO worklog_status
+        (date, status, submitted_by, submitted_at, rejected_by, rejected_to, rejected_at)
+        VALUES (?, '제출', ?, ?, '', '', '')""",
+        (date_str, session['user'], now))
+    conn.commit(); conn.close()
+    flash(f'{date_str} 업무일지가 제출되었습니다.', 'success')
+    return redirect(url_for('worklog_list'))
+
+# ════════════════════════════════════════════════════
 # 업무일지 리스트
 # ════════════════════════════════════════════════════
 @app.route('/worklog')
 @login_required
 def worklog_list():
     conn = get_db()
-    # 모든 테이블에서 날짜 수집
-    dates = set()
-    for tbl, col in [('staff_roster','date'),('vacation','start_date'),('oncall','date'),
-                     ('overtime','date'),('equipment_log','date'),('handover','date'),('issues','date')]:
-        rows = conn.execute(f"SELECT DISTINCT {col} FROM {tbl}").fetchall()
-        dates.update(r[0] for r in rows)
-    dates = sorted(dates, reverse=True)
+    # 관리자: 전체 제출/반려 목록 / 사용자: 본인 제출 + 본인에게 반려된 항목
+    if session.get('role') == 'admin':
+        statuses = conn.execute(
+            "SELECT * FROM worklog_status ORDER BY date DESC"
+        ).fetchall()
+        users = conn.execute("SELECT username, name FROM users ORDER BY name").fetchall()
+    else:
+        statuses = conn.execute(
+            """SELECT * FROM worklog_status
+            WHERE (status='제출' AND submitted_by=?)
+               OR (status='반려' AND rejected_to=?)
+            ORDER BY date DESC""",
+            (session['user'], session['user'])
+        ).fetchall()
+        users = []
 
     logs = []
-    for d in dates:
+    for ws in statuses:
+        d = ws['date']
         vac_rows = conn.execute("SELECT COUNT(*) as c FROM vacation WHERE start_date<=? AND end_date>=?", (d,d)).fetchone()['c']
-        ws = conn.execute("SELECT status, rejected_by FROM worklog_status WHERE date=?", (d,)).fetchone()
         logs.append({
-            'date':      d,
-            'roster':    conn.execute("SELECT COUNT(*) as c FROM staff_roster WHERE date=?",   (d,)).fetchone()['c'],
-            'vacation':  vac_rows,
-            'oncall':    conn.execute("SELECT COUNT(*) as c FROM oncall WHERE date=?",         (d,)).fetchone()['c'],
-            'overtime':  conn.execute("SELECT COUNT(*) as c FROM overtime WHERE date=?",       (d,)).fetchone()['c'],
-            'equipment': conn.execute("SELECT COUNT(*) as c FROM equipment_log WHERE date=?",  (d,)).fetchone()['c'],
-            'handover':  conn.execute("SELECT COUNT(*) as c FROM handover WHERE date=?",       (d,)).fetchone()['c'],
-            'issues':    conn.execute("SELECT COUNT(*) as c FROM issues WHERE date=?",         (d,)).fetchone()['c'],
-            'rejected':  ws is not None,
-            'rejected_by': ws['rejected_by'] if ws else '',
+            'date':         d,
+            'roster':       conn.execute("SELECT COUNT(*) as c FROM staff_roster WHERE date=?",   (d,)).fetchone()['c'],
+            'vacation':     vac_rows,
+            'oncall':       conn.execute("SELECT COUNT(*) as c FROM oncall WHERE date=?",         (d,)).fetchone()['c'],
+            'overtime':     conn.execute("SELECT COUNT(*) as c FROM overtime WHERE date=?",       (d,)).fetchone()['c'],
+            'equipment':    conn.execute("SELECT COUNT(*) as c FROM equipment_log WHERE date=?",  (d,)).fetchone()['c'],
+            'handover':     conn.execute("SELECT COUNT(*) as c FROM handover WHERE date=?",       (d,)).fetchone()['c'],
+            'issues':       conn.execute("SELECT COUNT(*) as c FROM issues WHERE date=?",         (d,)).fetchone()['c'],
+            'wl_status':    ws['status'],
+            'submitted_by': ws['submitted_by'] or '',
+            'rejected':     ws['status'] == '반려',
+            'rejected_by':  ws['rejected_by'] or '',
+            'rejected_to':  ws['rejected_to'] or '',
         })
     conn.close()
-    return render_template('worklog_list.html', logs=logs)
+    return render_template('worklog_list.html', logs=logs, users=users)
 
 # ════════════════════════════════════════════════════
 # 업무일지 반려
 # ════════════════════════════════════════════════════
-@app.route('/worklog/reject/<date_str>')
+@app.route('/worklog/reject/<date_str>', methods=['POST'])
 @login_required
 def worklog_reject(date_str):
     if session.get('role') != 'admin':
         flash('관리자만 반려할 수 있습니다.', 'danger')
         return redirect(url_for('worklog_list'))
+    target_user = request.form.get('target_user', '')
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     conn = get_db()
-    conn.execute("INSERT OR REPLACE INTO worklog_status (date, status, rejected_by) VALUES (?, '반려', ?)",
-        (date_str, session['name']))
+    conn.execute("""UPDATE worklog_status
+        SET status='반려', rejected_by=?, rejected_to=?, rejected_at=?
+        WHERE date=?""",
+        (session['name'], target_user, now, date_str))
     conn.commit(); conn.close()
     flash(f'{date_str} 업무일지가 반려되었습니다.', 'warning')
     return redirect(url_for('worklog_list'))
@@ -906,7 +953,9 @@ def worklog_unreject(date_str):
     if session.get('role') != 'admin':
         return redirect(url_for('worklog_list'))
     conn = get_db()
-    conn.execute("DELETE FROM worklog_status WHERE date=?", (date_str,))
+    conn.execute("""UPDATE worklog_status
+        SET status='제출', rejected_by='', rejected_to='', rejected_at=''
+        WHERE date=?""", (date_str,))
     conn.commit(); conn.close()
     flash(f'{date_str} 반려가 취소되었습니다.', 'success')
     return redirect(url_for('worklog_list'))

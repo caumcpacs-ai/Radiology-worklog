@@ -438,13 +438,36 @@
   </div>
 </div>
 
-<!-- 저장 버튼 -->
+<!-- 저장/제출 버튼 -->
 <div style="text-align:center;margin-top:30px;margin-bottom:60px">
-  <a href="{{ url_for('worklog_list') }}"
-     class="btn btn-primary"
-     style="padding:14px 60px;font-size:16px;font-weight:700;border-radius:8px;box-shadow:0 2px 8px rgba(26,115,232,.4)">
-    ✅ 저장 완료
-  </a>
+  {% if wl_status == '제출' %}
+  <div style="margin-bottom:12px">
+    <span style="background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600">
+      ✅ 제출됨
+    </span>
+  </div>
+  {% elif wl_status == '반려' %}
+  <div style="margin-bottom:12px">
+    <span style="background:#fdecea;color:#c62828;border:1px solid #ffcdd2;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600">
+      ⚠️ 반려됨 — 수정 후 다시 제출하세요
+    </span>
+  </div>
+  {% endif %}
+  <div style="display:flex;justify-content:center;gap:12px">
+    <a href="{{ url_for('worklog_list') }}"
+       class="btn btn-secondary"
+       style="padding:12px 40px;font-size:15px;font-weight:700;border-radius:8px">
+      💾 저장
+    </a>
+    <form method="post" action="{{ url_for('worklog_submit', date_str=sel) }}" style="display:inline">
+      <button type="submit"
+         class="btn btn-primary"
+         style="padding:12px 40px;font-size:15px;font-weight:700;border-radius:8px;box-shadow:0 2px 8px rgba(26,115,232,.4)"
+         onclick="return confirm('{{ sel }} 업무일지를 제출하시겠습니까?')">
+        📤 제출
+      </button>
+    </form>
+  </div>
 </div>
 
 <script>
