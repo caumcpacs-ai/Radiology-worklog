@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>영상의학과 업무일지 자동접속</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+        }
+        h2 { color: #2c3e50; margin-bottom: 20px; }
+        p { color: #555; line-height: 1.6; }
+        .input-group {
+            margin: 25px 0;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        input[type="text"] {
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            width: 200px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover { background-color: #2980b9; }
+        .footer-note { font-size: 13px; color: #888; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🏥 업무일지 접속 대기 중...</h2>
+    
+    <div id="setup-section">
+        <p>메인 서버(방화벽/서버를 켜둔 PC)의 <strong>IP 주소</strong>를 입력하고 접속 버튼을 눌러주세요.<br>(최초 1회만 입력하면 다음부터는 자동 접속됩니다!)</p>
+        <div class="input-group">
+            <input type="text" id="ipInput" placeholder="예: 192.168.0.10">
+            <button onclick="saveAndConnect()">접속 및 저장</button>
+        </div>
+        <p class="footer-note">서버 IP는 메인 서버 PC의 검은 창(명령 프롬프트)에서<br>ipconfig 명령어를 입력하여 확인할 수 있습니다.</p>
+    </div>
+
+    <script>
+        // 이전에 저장된 IP가 있는지 확인 (로컬 스토리지 사용)
+        const savedIP = localStorage.getItem('worklog_server_ip');
+        
+        if (savedIP) {
+            // 저장된 IP가 있으면 화면을 변경하고 바로 이동
+            document.body.innerHTML = `
+                <div class="container">
+                    <h2>🚀 메인 서버로 자동 접속 중입니다...</h2>
+                    <p>잠시만 기다려주세요.</p>
+                    <p class="footer-note">접속 주소: http://${savedIP}:1000</p>
+                    <button style="margin-top:20px; background-color:#e74c3c; font-size: 14px; padding: 6px 12px;" onclick="resetIP()">IP 주소 재설정하기</button>
+                </div>
+            `;
+            
+            // 1초 뒤에 자동으로 서버 주소로 이동
+            setTimeout(() => {
+                window.location.href = "http://" + savedIP + ":1000";
+            }, 1000);
+        }
+
+        function saveAndConnect() {
+            const ip = document.getElementById('ipInput').value.trim();
+            if (!ip) {
+                alert("IP 주소를 입력해주세요!");
+                return;
+            }
+            
+            // 입력한 IP를 브라우저에 저장
+            localStorage.setItem('worklog_server_ip', ip);
+            
+            // 해당 IP의 1000번 포트로 이동
+            window.location.href = "http://" + ip + ":1000";
+        }
+
+        function resetIP() {
+            // 저장된 IP 삭제 및 새로고침
+            localStorage.removeItem('worklog_server_ip');
+            window.location.reload();
+        }
+    </script>
+</div>
+
+</body>
+</html>
