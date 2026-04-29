@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block page_title %}{{ '✏️ 연장근무 수정' if row else '➕ 연장근무 등록' }}{% endblock %}
+{% block content %}
+<div class="form-container">
+  <div class="form-title">{{ '연장근무 수정' if row else '연장근무 등록' }}</div>
+  <form method="POST">
+    <div class="grid-2">
+      <div class="form-group">
+        <label>날짜</label>
+        <input type="date" name="date" value="{{ row.date if row else today }}" required>
+      </div>
+      <div class="form-group">
+        <label>직원명</label>
+        <input type="text" name="staff_name" value="{{ row.staff_name if row else '' }}" placeholder="홍길동" required>
+      </div>
+      <div class="form-group">
+        <label>연장 시작 시간</label>
+        <input type="time" name="start_time" value="{{ row.start_time if row else '' }}" required>
+      </div>
+      <div class="form-group">
+        <label>연장 종료 시간</label>
+        <input type="time" name="end_time" value="{{ row.end_time if row else '' }}" required>
+      </div>
+      <div class="form-group">
+        <label>승인자</label>
+        <input type="text" name="approved_by" value="{{ row.approved_by if row else '' }}" placeholder="파트장 이름">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>연장근무 사유</label>
+      <textarea name="reason" rows="3" placeholder="야간 응급검사, 장비 점검, 인력 부족 등" required>{{ row.reason if row else '' }}</textarea>
+    </div>
+    <div class="flex gap-1 mt-2">
+      <button type="submit" class="btn btn-primary">{{ '수정 완료' if row else '등록' }}</button>
+      <a href="{{ url_for('overtime') }}" class="btn btn-secondary">취소</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

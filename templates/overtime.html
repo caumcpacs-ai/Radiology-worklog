@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block page_title %}⏰ 연장근무{% endblock %}
+{% block content %}
+<div class="table-wrap">
+  <div class="table-header">
+    <h2>연장근무 현황</h2>
+    <a href="{{ url_for('overtime_add') }}" class="btn btn-primary">+ 등록</a>
+  </div>
+  <table>
+    <thead>
+      <tr><th>날짜</th><th>직원명</th><th>시작</th><th>종료</th><th>시간</th><th>사유</th><th>승인자</th><th>관리</th></tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td class="text-muted">{{ r.date }}</td>
+        <td><strong>{{ r.staff_name }}</strong></td>
+        <td>{{ r.start_time }}</td>
+        <td>{{ r.end_time }}</td>
+        <td><span class="badge badge-warning">{{ r.hours }}h</span></td>
+        <td>{{ r.reason }}</td>
+        <td>{{ r.approved_by or '-' }}</td>
+        <td>
+          <div class="flex gap-1">
+            <a href="{{ url_for('overtime_edit', id=r.id) }}" class="btn btn-sm btn-secondary">수정</a>
+            <a href="{{ url_for('overtime_delete', id=r.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('삭제?')">삭제</a>
+          </div>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="8" style="text-align:center;padding:24px;color:#aaa">등록된 연장근무가 없습니다.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

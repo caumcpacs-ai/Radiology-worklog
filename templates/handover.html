@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block page_title %}🔄 인수인계{% endblock %}
+{% block content %}
+<div class="table-wrap">
+  <div class="table-header">
+    <h2>인수인계 목록</h2>
+    <a href="{{ url_for('handover_add') }}" class="btn btn-primary">+ 신규 등록</a>
+  </div>
+  <table>
+    <thead>
+      <tr><th>날짜</th><th>교대</th><th>인계자</th><th>인수자</th><th>내용</th><th>우선순위</th><th>관리</th></tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td class="text-muted">{{ r.date }}</td>
+        <td><span class="badge badge-info">{{ r.shift }}</span></td>
+        <td>{{ r.from_person }}</td>
+        <td><strong>{{ r.to_person }}</strong></td>
+        <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.content }}</td>
+        <td><span class="badge {{ 'badge-danger' if r.priority=='긴급' else 'badge-warning' if r.priority=='중요' else 'badge-secondary' }}">{{ r.priority }}</span></td>
+        <td>
+          <div class="flex gap-1">
+            <a href="{{ url_for('handover_edit', id=r.id) }}" class="btn btn-sm btn-secondary">수정</a>
+            <a href="{{ url_for('handover_delete', id=r.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('삭제하시겠습니까?')">삭제</a>
+          </div>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7" style="text-align:center;padding:24px;color:#aaa">등록된 인수인계가 없습니다.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

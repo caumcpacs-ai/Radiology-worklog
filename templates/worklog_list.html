@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% block page_title %}📋 업무일지 리스트{% endblock %}
+{% block content %}
+<style>
+.log-table th, .log-table td { text-align:center; }
+.log-table td:first-child { text-align:left; font-weight:600; }
+.log-table td:last-child { text-align:center; white-space:nowrap; }
+.dot { display:inline-block; width:22px; height:22px; border-radius:50%; font-size:11px; line-height:22px; font-weight:700; }
+.dot.filled  { background:#1a73e8; color:#fff; }
+.dot.empty   { background:#eee; color:#aaa; }
+.badge-rejected { background:#fdecea; color:#c62828; border:1px solid #ffcdd2; font-size:11px; padding:2px 7px; border-radius:10px; font-weight:600; }
+</style>
+
+<div class="table-wrap">
+  <div class="table-header">
+    <h2>업무일지 리스트</h2>
+    <a href="{{ url_for('write') }}" class="btn btn-primary">+ 오늘 작성</a>
+  </div>
+  {% if logs %}
+  <table class="log-table">
+    <thead>
+      <tr>
+        <th>날짜</th>
+        <th>상태</th>
+        <th>👥 근무자</th>
+        <th>🌴 휴가</th>
+        <th>📱 On-call</th>
+        <th>⏰ 연장근무</th>
+        <th>🔧 장비이력</th>
+        <th>🔄 인수인계</th>
+        <th>⚠️ 이슈</th>
+        <th>관리</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for log in logs %}
+      <tr>
+        <td>{{ log.date }}</td>
+        <td>
+          {% if log.rejected %}
+            <span class="badge-rejected">반려 ({{ log.rejected_by }})</span>
+          {% else %}
+            <span class="badge badge-success">정상</span>
+          {% endif %}
+        </td>
+        <td><span class="dot {{ 'filled' if log.roster    else 'empty' }}">{{ log.roster    or '-' }}</span></td>
+        <td><span class="dot {{ 'filled' if log.vacation  else 'empty' }}">{{ log.vacation  or '-' }}</span></td>
+        <td><span class="dot {{ 'filled' if log.oncall    else 'empty' }}">{{ log.oncall    or '-' }}</span></td>
+        <td><span class="dot {{ 'filled' if log.overtime  else 'empty' }}">{{ log.overtime  or '-' }}</span></td>
+        <td><span class="dot {{ 'filled' if log.equipment else 'empty' }}">{{ log.equipment or '-' }}</span></td>
+        <td><span class="dot {{ 'filled' if log.handover  else 'empty' }}">{{ log.handover  or '-' }}</span></td>
+        <td><span class="dot {{ 'filled' if log.issues    else 'empty' }}">{{ log.issues    or '-' }}</span></td>
+        <td>
+          {# admin: 항상 수정/삭제/반려 버튼 표시 #}
+          {% if session.role == 'admin' %}
+            <a href="{{ url_for('write', date=log.date) }}" class="btn btn-sm btn-primary">수정</a>
+            <a href="{{ url_for('print_view', date_str=log.date) }}" target="_blank" class="btn btn-sm btn-secondary">인쇄</a>
+            {% if log.rejected %}
+              <a href="{{ url_for('worklog_unreject', date_str=log.date) }}" class="btn btn-sm btn-success"
+                 onclick="return confirm('반려를 취소하시겠습니까?')">반려취소</a>
+            {% else %}
+              <a href="{{ url_for('worklog_reject', date_str=log.date) }}" class="btn btn-sm btn-warning"
+                 onclick="return confirm('{{ log.date }} 업무일지를 반려하시겠습니까?')">반려</a>
+            {% endif %}
+          {# user: 반려된 경우에만 수정/인쇄 버튼 표시 #}
+          {% elif log.rejected %}
+            <a href="{{ url_for('write', date=log.date) }}" class="btn btn-sm btn-primary">수정</a>
+            <a href="{{ url_for('print_view', date_str=log.date) }}" target="_blank" class="btn btn-sm btn-secondary">인쇄</a>
+          {# user + 정상: 인쇄만 #}
+          {% else %}
+            <a href="{{ url_for('print_view', date_str=log.date) }}" target="_blank" class="btn btn-sm btn-secondary">인쇄</a>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-muted" style="padding:24px">작성된 업무일지가 없습니다. <a href="{{ url_for('write') }}">작성하기</a></p>
+  {% endif %}
+</div>
+{% endblock %}

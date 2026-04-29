@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block page_title %}🔧 장비 고장·점검 이력{% endblock %}
+{% block content %}
+<div class="table-wrap">
+  <div class="table-header">
+    <h2>장비 이력</h2>
+    <a href="{{ url_for('equipment_add') }}" class="btn btn-primary">+ 신규 등록</a>
+  </div>
+  <table>
+    <thead>
+      <tr><th>날짜</th><th>장비</th><th>유형</th><th>내용</th><th>엔지니어</th><th>다운타임(h)</th><th>상태</th><th>관리</th></tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td class="text-muted">{{ r.date }}</td>
+        <td><strong>{{ r.equipment }}</strong></td>
+        <td><span class="badge {{ 'badge-danger' if r.log_type=='고장' else 'badge-warning' if r.log_type=='점검' else 'badge-success' if r.log_type=='수리완료' else 'badge-info' }}">{{ r.log_type }}</span></td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.description }}</td>
+        <td>{{ r.engineer or '-' }}</td>
+        <td>{{ r.downtime_hours if r.downtime_hours else '-' }}</td>
+        <td><span class="badge {{ 'badge-warning' if r.status=='처리중' else 'badge-success' }}">{{ r.status }}</span></td>
+        <td>
+          <div class="flex gap-1">
+            <a href="{{ url_for('equipment_edit', id=r.id) }}" class="btn btn-sm btn-secondary">수정</a>
+            <a href="{{ url_for('equipment_delete', id=r.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('삭제하시겠습니까?')">삭제</a>
+          </div>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="8" style="text-align:center;padding:24px;color:#aaa">등록된 이력이 없습니다.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

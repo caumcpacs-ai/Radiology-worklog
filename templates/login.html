@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>로그인 - 영상의학과 업무일지</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'맑은 고딕','Malgun Gothic',sans-serif;background:#1e2a3a;display:flex;align-items:center;justify-content:center;min-height:100vh}
+.login-box{background:#fff;border-radius:12px;padding:40px;width:360px;box-shadow:0 8px 32px rgba(0,0,0,.3)}
+.logo{text-align:center;margin-bottom:28px}
+.logo .icon{font-size:40px;display:block;margin-bottom:8px}
+.logo h1{font-size:18px;font-weight:700;color:#1e2a3a}
+.logo p{font-size:12px;color:#888;margin-top:4px}
+label{display:block;margin-bottom:4px;font-size:13px;font-weight:600;color:#555}
+input{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;font-family:inherit;margin-bottom:14px}
+input:focus{outline:none;border-color:#1a73e8}
+button{width:100%;padding:11px;background:#1a73e8;color:#fff;border:none;border-radius:6px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}
+button:hover{background:#1558b0}
+.alert{background:#fdecea;color:#c62828;border:1px solid #ffcdd2;border-radius:4px;padding:8px 12px;margin-bottom:14px;font-size:13px}
+.hint{text-align:center;margin-top:14px;font-size:11px;color:#aaa}
+</style>
+</head>
+<body>
+<div class="login-box">
+  <div class="logo">
+    <span class="icon">🏥</span>
+    <h1>영상의학과 업무일지</h1>
+    <p>Radiology Department Work Log</p>
+  </div>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="alert">{{ msg }}</div>
+    {% endfor %}
+  {% endwith %}
+  <form method="POST">
+    <label>아이디</label>
+    <input type="text" name="username" placeholder="아이디 입력" required autofocus>
+    <label>비밀번호</label>
+    <input type="password" name="password" placeholder="비밀번호 입력" required>
+    <button type="submit">로그인</button>
+  </form>
+  <p class="hint">초기 계정: admin / admin1234</p>
+</div>
+</body>
+</html>

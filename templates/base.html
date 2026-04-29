@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>영상의학과 업무일지</title>
+<style>
+/* ── 공통 리셋 ── */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'맑은 고딕','Malgun Gothic',sans-serif;background:#f0f2f5;color:#333;font-size:14px}
+a{text-decoration:none;color:inherit}
+table{width:100%;border-collapse:collapse}
+th,td{padding:8px 12px;border-bottom:1px solid #e0e0e0;text-align:left;vertical-align:middle}
+th{background:#f8f9fa;font-weight:600;color:#555}
+tr:hover{background:#fafbfc}
+input,select,textarea{width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:4px;font-size:14px;font-family:inherit}
+textarea{resize:vertical;min-height:80px}
+button,.btn{padding:7px 16px;border:none;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit;font-weight:500}
+.btn-primary{background:#1a73e8;color:#fff}
+.btn-primary:hover{background:#1558b0}
+.btn-success{background:#34a853;color:#fff}
+.btn-danger{background:#ea4335;color:#fff}
+.btn-warning{background:#fbbc04;color:#333}
+.btn-secondary{background:#6c757d;color:#fff}
+.btn-sm{padding:4px 10px;font-size:12px}
+label{display:block;margin-bottom:4px;font-weight:500;color:#555}
+.form-group{margin-bottom:14px}
+.card{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.1);padding:20px;margin-bottom:16px}
+.card-title{font-size:15px;font-weight:700;margin-bottom:14px;color:#1a73e8;border-bottom:2px solid #1a73e8;padding-bottom:6px}
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}
+.badge-danger{background:#fdecea;color:#c62828}
+.badge-warning{background:#fff8e1;color:#f57f17}
+.badge-success{background:#e8f5e9;color:#2e7d32}
+.badge-info{background:#e3f2fd;color:#1565c0}
+.badge-secondary{background:#f5f5f5;color:#555}
+.alert{padding:10px 16px;border-radius:4px;margin-bottom:12px;font-size:13px}
+.alert-success{background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9}
+.alert-danger{background:#fdecea;color:#c62828;border:1px solid #ffcdd2}
+.alert-info{background:#e3f2fd;color:#1565c0;border:1px solid #bbdefb}
+.text-muted{color:#888;font-size:12px}
+.text-right{text-align:right}
+.mt-2{margin-top:8px}
+.mb-2{margin-bottom:8px}
+.gap-1{gap:6px}
+.flex{display:flex}
+.flex-wrap{flex-wrap:wrap}
+.align-center{align-items:center}
+.justify-between{justify-content:space-between}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+
+/* ── 사이드바 ── */
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:200px;background:#1e2a3a;color:#fff;padding:0;overflow-y:auto;z-index:100;display:flex;flex-direction:column}
+.sidebar-header{padding:18px 16px;background:#152232;font-size:13px;font-weight:700;border-bottom:1px solid #2a3f55}
+.sidebar-header .dept{color:#8ab4f8;font-size:11px;margin-top:2px}
+.sidebar nav a{display:block;padding:10px 16px;color:#b0bec5;font-size:13px;border-left:3px solid transparent;transition:.2s}
+.sidebar nav a:hover,.sidebar nav a.active{background:#2a3f55;color:#fff;border-left-color:#1a73e8}
+.sidebar nav .nav-section{padding:8px 16px 4px;font-size:10px;color:#546e7a;text-transform:uppercase;letter-spacing:.8px;margin-top:4px}
+.sidebar-footer{padding:12px 16px;border-top:1px solid #2a3f55;font-size:12px;color:#78909c}
+
+/* ── 메인 콘텐츠 ── */
+.main{margin-left:200px;min-height:100vh}
+.topbar{background:#fff;padding:12px 24px;border-bottom:1px solid #e0e0e0;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:50}
+.topbar .page-title{font-size:16px;font-weight:700;color:#1e2a3a}
+.content{padding:20px 24px 60px}
+
+/* ── 통계 카드 ── */
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
+.stat-card{background:#fff;border-radius:8px;padding:16px 20px;box-shadow:0 1px 4px rgba(0,0,0,.1);border-left:4px solid #1a73e8;display:flex;flex-direction:column}
+.stat-card .num{font-size:28px;font-weight:700;color:#1a73e8}
+.stat-card .lbl{font-size:12px;color:#888;margin-top:2px}
+.stat-card.red{border-left-color:#ea4335}.stat-card.red .num{color:#ea4335}
+.stat-card.green{border-left-color:#34a853}.stat-card.green .num{color:#34a853}
+.stat-card.yellow{border-left-color:#fbbc04}.stat-card.yellow .num{color:#f57f17}
+.stat-card.purple{border-left-color:#9c27b0}.stat-card.purple .num{color:#9c27b0}
+.stat-card.teal{border-left-color:#009688}.stat-card.teal .num{color:#009688}
+
+/* ── 테이블 래퍼 ── */
+.table-wrap{overflow-x:auto;background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+.table-wrap table{margin:0}
+.table-header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid #e0e0e0}
+.table-header h2{font-size:15px;font-weight:700}
+
+/* ── 폼 컨테이너 ── */
+.form-container{max-width:700px;background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.1);padding:24px}
+.form-title{font-size:16px;font-weight:700;margin-bottom:20px;padding-bottom:10px;border-bottom:2px solid #1a73e8;color:#1e2a3a}
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-header">
+    🏥 영상의학과 업무일지
+    <div class="dept">Radiology Dept.</div>
+  </div>
+  <nav style="flex:1">
+    <a href="{{ url_for('dashboard') }}"    class="{{ 'active' if request.endpoint=='dashboard' }}">📊 메인</a>
+    <a href="{{ url_for('write') }}"        class="{{ 'active' if 'write' in request.endpoint }}">✏️ 작성</a>
+    <a href="{{ url_for('worklog_list') }}" class="{{ 'active' if request.endpoint=='worklog_list' }}">📋 업무일지 리스트</a>
+    {% if session.role == 'admin' %}
+    <div class="nav-section">관리</div>
+    <a href="{{ url_for('users') }}" class="{{ 'active' if 'user' in request.endpoint }}">👥 사용자 관리</a>
+    {% endif %}
+  </nav>
+  <div class="sidebar-footer">
+    👤 {{ session.name }} ({{ '관리자' if session.role == 'admin' else '사용자' }})<br>
+    <a href="{{ url_for('logout') }}" style="color:#ef9a9a">로그아웃</a>
+  </div>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <div class="page-title">{% block page_title %}{% endblock %}</div>
+    <div class="text-muted">{{ now }}</div>
+  </div>
+  <div class="content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block page_title %}{{ '✏️ 인수인계 수정' if row else '➕ 인수인계 등록' }}{% endblock %}
+{% block content %}
+<div class="form-container">
+  <div class="form-title">{{ '인수인계 수정' if row else '인수인계 등록' }}</div>
+  <form method="POST">
+    <div class="grid-3">
+      <div class="form-group">
+        <label>날짜</label>
+        <input type="date" name="date" value="{{ row.date if row else today }}" required>
+      </div>
+      <div class="form-group">
+        <label>교대 구분</label>
+        <select name="shift" required>
+          {% for v in ['오전','오후','야간'] %}
+          <option value="{{ v }}" {{ 'selected' if row and row.shift==v }}>{{ v }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>우선순위</label>
+        <select name="priority">
+          {% for v in ['일반','중요','긴급'] %}
+          <option value="{{ v }}" {{ 'selected' if row and row.priority==v }}>{{ v }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>인계자 (인수인계 하는 사람)</label>
+        <input type="text" name="from_person" value="{{ row.from_person if row else '' }}" placeholder="홍길동" required>
+      </div>
+      <div class="form-group">
+        <label>인수자 (인수인계 받는 사람)</label>
+        <input type="text" name="to_person" value="{{ row.to_person if row else '' }}" placeholder="김철수" required>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>인수인계 내용</label>
+      <textarea name="content" rows="6" placeholder="인수인계 사항을 상세히 입력하세요&#10;(장비 상태, 진행 중인 업무, 주의사항 등)" required>{{ row.content if row else '' }}</textarea>
+    </div>
+    <div class="flex gap-1 mt-2">
+      <button type="submit" class="btn btn-primary">{{ '수정 완료' if row else '등록' }}</button>
+      <a href="{{ url_for('handover') }}" class="btn btn-secondary">취소</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

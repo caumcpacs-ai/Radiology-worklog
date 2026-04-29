@@ -1,0 +1,467 @@
+{% extends 'base.html' %}
+{% block page_title %}✏️ 작성{% endblock %}
+{% block content %}
+<style>
+.date-bar{display:flex;align-items:center;gap:12px;margin-bottom:20px;background:#fff;padding:14px 18px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+.date-bar input[type=date]{width:180px;font-size:15px;font-weight:600;border:2px solid #1a73e8;border-radius:6px;padding:6px 10px;color:#1e2a3a}
+.acc{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.1);margin-bottom:10px;overflow:hidden}
+.acc-head{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;cursor:pointer;user-select:none;border-left:4px solid #1a73e8;font-weight:700;font-size:14px;background:#fff}
+.acc-head:hover{background:#f5f8ff}
+.acc-head .cnt{font-size:12px;color:#888;font-weight:400;margin-left:6px}
+.acc-head .toggle{font-size:18px;color:#aaa;transition:.2s}
+.acc-body{display:block;padding:0 18px 16px;border-top:1px solid #f0f0f0}
+.add-form{background:#f8f9fb;border-radius:6px;padding:14px;margin-top:10px;border:1px dashed #ccc}
+.add-form .form-row{display:grid;gap:8px;margin-bottom:8px}
+.add-form .form-row.col2{grid-template-columns:1fr 1fr}
+.add-form .form-row.col3{grid-template-columns:1fr 1fr 1fr}
+.add-form .form-row.col4{grid-template-columns:1fr 1fr 1fr 1fr}
+.add-form label{font-size:12px;margin-bottom:2px;color:#555}
+.edit-form{background:#fffde7;border-radius:6px;padding:14px;margin-bottom:4px;border:1px solid #f9a825;display:none}
+.edit-form .form-row{display:grid;gap:8px;margin-bottom:8px}
+.edit-form .form-row.col2{grid-template-columns:1fr 1fr}
+.edit-form .form-row.col3{grid-template-columns:1fr 1fr 1fr}
+.edit-form .form-row.col4{grid-template-columns:1fr 1fr 1fr 1fr}
+.edit-form label{font-size:12px;margin-bottom:2px;color:#555}
+.entry-list{margin-top:10px}
+.entry-row{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-radius:4px;background:#fafafa;border:1px solid #eee;margin-bottom:4px;font-size:13px;gap:8px}
+.entry-row .info{flex:1;min-width:0}
+.entry-row .btns{display:flex;gap:4px;flex-shrink:0}
+.acc-head.roster-h{border-left-color:#5c6bc0}
+.acc-head.vacation-h{border-left-color:#26a69a}
+.acc-head.oncall-h{border-left-color:#1a73e8}
+.acc-head.overtime-h{border-left-color:#f57c00}
+.acc-head.equip-h{border-left-color:#e53935}
+.acc-head.handover-h{border-left-color:#43a047}
+.acc-head.issue-h{border-left-color:#8e24aa}
+</style>
+
+<!-- 제목 -->
+<h1 style="text-align:center;font-size:22px;font-weight:700;color:#1e2a3a;margin-bottom:16px;letter-spacing:1px">영상의학과 업무일지</h1>
+
+<!-- 날짜 선택 -->
+<div class="date-bar">
+  <span style="font-weight:700;color:#555">날짜 선택</span>
+  <form method="get" style="display:flex;align-items:center;gap:8px">
+    <input type="date" name="date" value="{{ sel }}" onchange="this.form.submit()">
+  </form>
+  <span style="color:#1e2a3a;font-size:15px;font-weight:600">{{ sel }} 업무일지</span>
+  <div style="margin-left:auto;display:flex;gap:8px">
+    <a href="{{ url_for('write_reset', date_str=sel) }}"
+       class="btn btn-danger"
+       onclick="return confirm('{{ sel }} 날짜의 모든 데이터를 초기화하시겠습니까?')">🔄 초기화</a>
+    <a href="{{ url_for('print_view', date_str=sel) }}" target="_blank" class="btn btn-secondary">🖨️ 인쇄</a>
+  </div>
+</div>
+
+<!-- ① 근무자 현황 -->
+<div class="acc">
+  <div class="acc-head roster-h" onclick="toggle(this)">
+    👥 근무자 현황 <span class="cnt">({{ roster|length }}건)</span>
+    <span class="toggle">▲</span>
+  </div>
+  <div class="acc-body">
+    <div class="entry-list">
+    {% for r in roster %}
+      <div class="entry-row" id="row-r{{ r.id }}">
+        <div class="info"><span class="badge badge-info">{{ r.shift }}</span> <strong>{{ r.staff_name }}</strong> {{ r.role or '' }} {{ r.note or '' }}</div>
+        <div class="btns">
+          <button type="button" onclick="editRow('r{{ r.id }}')" class="btn btn-sm btn-primary">수정</button>
+          <a href="{{ url_for('write_roster_delete', id=r.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('삭제?')">삭제</a>
+        </div>
+      </div>
+      <div class="edit-form" id="edit-r{{ r.id }}">
+        <form method="post" action="{{ url_for('write_roster_edit', id=r.id) }}">
+          <div class="form-row col3">
+            <div><label>근무조</label><select name="shift">
+              <option {% if r.shift=='오전' %}selected{% endif %}>오전</option>
+              <option {% if r.shift=='종일' %}selected{% endif %}>종일</option>
+              <option {% if r.shift=='야간' %}selected{% endif %}>야간</option>
+            </select></div>
+            <div><label>성명</label><input name="staff_name" value="{{ r.staff_name }}" required></div>
+            <div><label>직종</label><input name="role" value="{{ r.role or '' }}"></div>
+          </div>
+          <div class="form-row"><div><label>비고</label><input name="note" value="{{ r.note or '' }}"></div></div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm btn-primary">저장</button>
+            <button type="button" onclick="cancelEdit('r{{ r.id }}')" class="btn btn-sm btn-secondary">취소</button>
+          </div>
+        </form>
+      </div>
+    {% endfor %}
+    </div>
+    <div class="add-form">
+      <form method="post" action="{{ url_for('write_roster_add') }}">
+        <input type="hidden" name="date" value="{{ sel }}">
+        <div class="form-row col3">
+          <div><label>근무조</label><select name="shift"><option>오전</option><option>종일</option><option>야간</option></select></div>
+          <div><label>성명</label><input name="staff_name" required placeholder="홍길동"></div>
+          <div><label>직종</label><input name="role" placeholder="방사선사"></div>
+        </div>
+        <div class="form-row"><div><label>비고</label><input name="note" placeholder="특이사항"></div></div>
+        <button class="btn btn-primary btn-sm">+ 추가</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ② 휴가 현황 -->
+<div class="acc">
+  <div class="acc-head vacation-h" onclick="toggle(this)">
+    🌴 휴가 현황 <span class="cnt">({{ vacation|length }}건)</span>
+    <span class="toggle">▲</span>
+  </div>
+  <div class="acc-body">
+    <div class="entry-list">
+    {% for r in vacation %}
+      <div class="entry-row" id="row-v{{ r.id }}">
+        <div class="info"><strong>{{ r.staff_name }}</strong> <span class="badge badge-info">{{ r.vacation_type }}</span> {{ r.start_date }}</div>
+        <div class="btns">
+          <button type="button" onclick="editRow('v{{ r.id }}')" class="btn btn-sm btn-primary">수정</button>
+          <a href="{{ url_for('write_vacation_delete', id=r.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('삭제?')">삭제</a>
+        </div>
+      </div>
+      <div class="edit-form" id="edit-v{{ r.id }}">
+        <form method="post" action="{{ url_for('write_vacation_edit', id=r.id) }}">
+          <div class="form-row col3">
+            <div><label>성명</label><input name="staff_name" value="{{ r.staff_name }}" required></div>
+            <div><label>구분</label><select name="vacation_type">
+              <option {% if r.vacation_type=='연차' %}selected{% endif %}>연차</option>
+              <option {% if r.vacation_type=='반차' %}selected{% endif %}>반차</option>
+              <option {% if r.vacation_type=='병가' %}selected{% endif %}>병가</option>
+              <option {% if r.vacation_type=='공가' %}selected{% endif %}>공가</option>
+              <option {% if r.vacation_type=='기타' %}selected{% endif %}>기타</option>
+            </select></div>
+            <div><label>날짜</label><input type="date" name="start_date" value="{{ r.start_date }}" required></div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm btn-primary">저장</button>
+            <button type="button" onclick="cancelEdit('v{{ r.id }}')" class="btn btn-sm btn-secondary">취소</button>
+          </div>
+        </form>
+      </div>
+    {% endfor %}
+    </div>
+    <div class="add-form">
+      <form method="post" action="{{ url_for('write_vacation_add') }}">
+        <input type="hidden" name="date" value="{{ sel }}">
+        <div class="form-row col3">
+          <div><label>성명</label><input name="staff_name" required placeholder="홍길동"></div>
+          <div><label>구분</label><select name="vacation_type"><option>연차</option><option>반차</option><option>병가</option><option>공가</option><option>기타</option></select></div>
+          <div><label>날짜</label><input type="date" name="start_date" value="{{ sel }}" required></div>
+        </div>
+        <button class="btn btn-success btn-sm">+ 추가</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ③ On-call -->
+<div class="acc">
+  <div class="acc-head oncall-h" onclick="toggle(this)">
+    📱 On-call <span class="cnt">({{ oncall|length }}건)</span>
+    <span class="toggle">▲</span>
+  </div>
+  <div class="acc-body">
+    <div class="entry-list">
+    {% for r in oncall %}
+      <div class="entry-row" id="row-o{{ r.id }}">
+        <div class="info"><span class="badge badge-info">{{ r.modality }}</span> <strong>{{ r.staff_name }}</strong> {% if r.start_time %}{{ r.start_time }}~{{ r.end_time }}{% endif %} {{ r.note or '' }}</div>
+        <div class="btns">
+          <button type="button" onclick="editRow('o{{ r.id }}')" class="btn btn-sm btn-primary">수정</button>
+          <a href="{{ url_for('write_oncall_delete', id=r.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('삭제?')">삭제</a>
+        </div>
+      </div>
+      <div class="edit-form" id="edit-o{{ r.id }}">
+        <form method="post" action="{{ url_for('write_oncall_edit', id=r.id) }}">
+          <div class="form-row col4">
+            <div><label>모달리티</label><select name="modality">
+              <option {% if r.modality=='CT' %}selected{% endif %}>CT</option>
+              <option {% if r.modality=='MRI' %}selected{% endif %}>MRI</option>
+              <option {% if r.modality=='일반' %}selected{% endif %}>일반</option>
+              <option {% if r.modality=='전체' %}selected{% endif %}>전체</option>
+            </select></div>
+            <div><label>담당자</label><input name="staff_name" value="{{ r.staff_name }}" required></div>
+            <div><label>시작</label><input type="time" name="start_time" value="{{ r.start_time or '' }}"></div>
+            <div><label>종료</label><input type="time" name="end_time" value="{{ r.end_time or '' }}"></div>
+          </div>
+          <div class="form-row"><div><label>내용</label><input name="note" value="{{ r.note or '' }}"></div></div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm btn-primary">저장</button>
+            <button type="button" onclick="cancelEdit('o{{ r.id }}')" class="btn btn-sm btn-secondary">취소</button>
+          </div>
+        </form>
+      </div>
+    {% endfor %}
+    </div>
+    <div class="add-form">
+      <form method="post" action="{{ url_for('write_oncall_add') }}">
+        <input type="hidden" name="date" value="{{ sel }}">
+        <div class="form-row col4">
+          <div><label>모달리티</label><select name="modality"><option>CT</option><option>MRI</option><option>일반</option><option>전체</option></select></div>
+          <div><label>담당자</label><input name="staff_name" required placeholder="홍길동"></div>
+          <div><label>시작</label><input type="time" name="start_time"></div>
+          <div><label>종료</label><input type="time" name="end_time"></div>
+        </div>
+        <div class="form-row"><div><label>내용</label><input name="note" placeholder="내용"></div></div>
+        <button class="btn btn-primary btn-sm">+ 추가</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ④ 연장근무 -->
+<div class="acc">
+  <div class="acc-head overtime-h" onclick="toggle(this)">
+    ⏰ 연장근무 <span class="cnt">({{ overtime|length }}건)</span>
+    <span class="toggle">▲</span>
+  </div>
+  <div class="acc-body">
+    <div class="entry-list">
+    {% for r in overtime %}
+      <div class="entry-row" id="row-ot{{ r.id }}">
+        <div class="info"><strong>{{ r.staff_name }}</strong> {{ r.start_time }}~{{ r.end_time }} ({{ r.hours }}h) {{ r.reason }}</div>
+        <div class="btns">
+          <button type="button" onclick="editRow('ot{{ r.id }}')" class="btn btn-sm btn-primary">수정</button>
+          <a href="{{ url_for('write_overtime_delete', id=r.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('삭제?')">삭제</a>
+        </div>
+      </div>
+      <div class="edit-form" id="edit-ot{{ r.id }}">
+        <form method="post" action="{{ url_for('write_overtime_edit', id=r.id) }}">
+          <div class="form-row col3">
+            <div><label>성명</label><input name="staff_name" value="{{ r.staff_name }}" required></div>
+            <div><label>시작</label><input type="time" name="start_time" value="{{ r.start_time }}" required></div>
+            <div><label>종료</label><input type="time" name="end_time" value="{{ r.end_time }}" required></div>
+          </div>
+          <div class="form-row"><div><label>사유</label><input name="reason" value="{{ r.reason }}" required></div></div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm btn-primary">저장</button>
+            <button type="button" onclick="cancelEdit('ot{{ r.id }}')" class="btn btn-sm btn-secondary">취소</button>
+          </div>
+        </form>
+      </div>
+    {% endfor %}
+    </div>
+    <div class="add-form">
+      <form method="post" action="{{ url_for('write_overtime_add') }}">
+        <input type="hidden" name="date" value="{{ sel }}">
+        <div class="form-row col3">
+          <div><label>성명</label><input name="staff_name" required placeholder="홍길동"></div>
+          <div><label>시작</label><input type="time" name="start_time" required></div>
+          <div><label>종료</label><input type="time" name="end_time" required></div>
+        </div>
+        <div class="form-row"><div><label>사유</label><input name="reason" required placeholder="연장근무 사유"></div></div>
+        <button class="btn btn-warning btn-sm">+ 추가</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ⑤ 장비 이력 -->
+<div class="acc">
+  <div class="acc-head equip-h" onclick="toggle(this)">
+    🔧 장비 이력 <span class="cnt">({{ equipment|length }}건)</span>
+    <span class="toggle">▲</span>
+  </div>
+  <div class="acc-body">
+    <div class="entry-list">
+    {% for r in equipment %}
+      <div class="entry-row" id="row-e{{ r.id }}">
+        <div class="info"><span class="badge badge-danger">{{ r.equipment }}</span> <span class="badge badge-warning">{{ r.log_type }}</span> {{ r.description }} {% if r.engineer %}({{ r.engineer }}){% endif %} <span class="badge {{ 'badge-success' if r.status=='완료' else 'badge-danger' }}">{{ r.status }}</span></div>
+        <div class="btns">
+          <button type="button" onclick="editRow('e{{ r.id }}')" class="btn btn-sm btn-primary">수정</button>
+          <a href="{{ url_for('write_equipment_delete', id=r.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('삭제?')">삭제</a>
+        </div>
+      </div>
+      <div class="edit-form" id="edit-e{{ r.id }}">
+        <form method="post" action="{{ url_for('write_equipment_edit', id=r.id) }}">
+          <div class="form-row col4">
+            <div><label>장비</label><input name="equipment" value="{{ r.equipment }}" required></div>
+            <div><label>유형</label><select name="log_type">
+              <option {% if r.log_type=='고장' %}selected{% endif %}>고장</option>
+              <option {% if r.log_type=='점검' %}selected{% endif %}>점검</option>
+              <option {% if r.log_type=='수리완료' %}selected{% endif %}>수리완료</option>
+              <option {% if r.log_type=='PM' %}selected{% endif %}>PM</option>
+            </select></div>
+            <div><label>엔지니어</label><input name="engineer" value="{{ r.engineer or '' }}"></div>
+            <div><label>다운타임(h)</label><input type="number" name="downtime_hours" value="{{ r.downtime_hours }}" step="0.5" min="0"></div>
+          </div>
+          <div class="form-row col2">
+            <div><label>내용</label><input name="description" value="{{ r.description }}" required></div>
+            <div><label>상태</label><select name="status">
+              <option {% if r.status=='처리중' %}selected{% endif %}>처리중</option>
+              <option {% if r.status=='완료' %}selected{% endif %}>완료</option>
+            </select></div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm btn-primary">저장</button>
+            <button type="button" onclick="cancelEdit('e{{ r.id }}')" class="btn btn-sm btn-secondary">취소</button>
+          </div>
+        </form>
+      </div>
+    {% endfor %}
+    </div>
+    <div class="add-form">
+      <form method="post" action="{{ url_for('write_equipment_add') }}">
+        <input type="hidden" name="date" value="{{ sel }}">
+        <div class="form-row col4">
+          <div><label>장비</label><input name="equipment" required placeholder="CT1, MRI2..."></div>
+          <div><label>유형</label><select name="log_type"><option>고장</option><option>점검</option><option>수리완료</option><option>PM</option></select></div>
+          <div><label>엔지니어</label><input name="engineer" placeholder="성명"></div>
+          <div><label>다운타임(h)</label><input type="number" name="downtime_hours" value="0" step="0.5" min="0"></div>
+        </div>
+        <div class="form-row col2">
+          <div><label>내용</label><input name="description" required placeholder="상세 내용"></div>
+          <div><label>상태</label><select name="status"><option>처리중</option><option>완료</option></select></div>
+        </div>
+        <button class="btn btn-danger btn-sm">+ 추가</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ⑥ 인수인계 -->
+<div class="acc">
+  <div class="acc-head handover-h" onclick="toggle(this)">
+    🔄 인수인계 <span class="cnt">({{ handover|length }}건)</span>
+    <span class="toggle">▲</span>
+  </div>
+  <div class="acc-body">
+    <div class="entry-list">
+    {% for r in handover %}
+      <div class="entry-row" id="row-h{{ r.id }}">
+        <div class="info"><span class="badge badge-info">{{ r.shift }}</span> {{ r.from_person }} → {{ r.to_person }} <span class="badge {{ 'badge-danger' if r.priority=='긴급' else 'badge-warning' if r.priority=='중요' else 'badge-secondary' }}">{{ r.priority }}</span><br><span style="font-size:12px;color:#555">{{ r.content[:80] }}{% if r.content|length>80 %}...{% endif %}</span></div>
+        <div class="btns">
+          <button type="button" onclick="editRow('h{{ r.id }}')" class="btn btn-sm btn-primary">수정</button>
+          <a href="{{ url_for('write_handover_delete', id=r.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('삭제?')">삭제</a>
+        </div>
+      </div>
+      <div class="edit-form" id="edit-h{{ r.id }}">
+        <form method="post" action="{{ url_for('write_handover_edit', id=r.id) }}">
+          <div class="form-row col4">
+            <div><label>근무조</label><select name="shift">
+              <option {% if r.shift=='오전' %}selected{% endif %}>오전</option>
+              <option {% if r.shift=='오후' %}selected{% endif %}>오후</option>
+              <option {% if r.shift=='야간' %}selected{% endif %}>야간</option>
+            </select></div>
+            <div><label>인계자</label><input name="from_person" value="{{ r.from_person }}" required></div>
+            <div><label>인수자</label><input name="to_person" value="{{ r.to_person }}" required></div>
+            <div><label>우선순위</label><select name="priority">
+              <option {% if r.priority=='일반' %}selected{% endif %}>일반</option>
+              <option {% if r.priority=='중요' %}selected{% endif %}>중요</option>
+              <option {% if r.priority=='긴급' %}selected{% endif %}>긴급</option>
+            </select></div>
+          </div>
+          <div class="form-row"><div><label>내용</label><textarea name="content" required rows="2">{{ r.content }}</textarea></div></div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm btn-primary">저장</button>
+            <button type="button" onclick="cancelEdit('h{{ r.id }}')" class="btn btn-sm btn-secondary">취소</button>
+          </div>
+        </form>
+      </div>
+    {% endfor %}
+    </div>
+    <div class="add-form">
+      <form method="post" action="{{ url_for('write_handover_add') }}">
+        <input type="hidden" name="date" value="{{ sel }}">
+        <div class="form-row col4">
+          <div><label>근무조</label><select name="shift"><option>오전</option><option>오후</option><option>야간</option></select></div>
+          <div><label>인계자</label><input name="from_person" required placeholder="홍길동"></div>
+          <div><label>인수자</label><input name="to_person" required placeholder="김철수"></div>
+          <div><label>우선순위</label><select name="priority"><option>일반</option><option>중요</option><option>긴급</option></select></div>
+        </div>
+        <div class="form-row"><div><label>내용</label><textarea name="content" required rows="2" placeholder="인수인계 내용"></textarea></div></div>
+        <button class="btn btn-success btn-sm">+ 추가</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ⑦ 특이사항·이슈 -->
+<div class="acc">
+  <div class="acc-head issue-h" onclick="toggle(this)">
+    ⚠️ 특이사항·이슈 <span class="cnt">({{ issues|length }}건)</span>
+    <span class="toggle">▲</span>
+  </div>
+  <div class="acc-body">
+    <div class="entry-list">
+    {% for r in issues %}
+      <div class="entry-row" id="row-i{{ r.id }}">
+        <div class="info"><span class="badge badge-info">{{ r.category }}</span> <span class="badge {{ 'badge-danger' if r.severity=='긴급' else 'badge-warning' if r.severity=='중요' else 'badge-secondary' }}">{{ r.severity }}</span> <strong>{{ r.title }}</strong> <span class="badge {{ 'badge-danger' if r.status=='진행중' else 'badge-success' if r.status=='해결' else 'badge-secondary' }}">{{ r.status }}</span></div>
+        <div class="btns">
+          <button type="button" onclick="editRow('i{{ r.id }}')" class="btn btn-sm btn-primary">수정</button>
+          <a href="{{ url_for('write_issue_delete', id=r.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('삭제?')">삭제</a>
+        </div>
+      </div>
+      <div class="edit-form" id="edit-i{{ r.id }}">
+        <form method="post" action="{{ url_for('write_issue_edit', id=r.id) }}">
+          <div class="form-row col4">
+            <div><label>구분</label><select name="category">
+              <option {% if r.category=='장비' %}selected{% endif %}>장비</option>
+              <option {% if r.category=='환자' %}selected{% endif %}>환자</option>
+              <option {% if r.category=='행정' %}selected{% endif %}>행정</option>
+              <option {% if r.category=='기타' %}selected{% endif %}>기타</option>
+            </select></div>
+            <div><label>심각도</label><select name="severity">
+              <option {% if r.severity=='일반' %}selected{% endif %}>일반</option>
+              <option {% if r.severity=='중요' %}selected{% endif %}>중요</option>
+              <option {% if r.severity=='긴급' %}selected{% endif %}>긴급</option>
+            </select></div>
+            <div><label>상태</label><select name="status">
+              <option {% if r.status=='진행중' %}selected{% endif %}>진행중</option>
+              <option {% if r.status=='해결' %}selected{% endif %}>해결</option>
+              <option {% if r.status=='보류' %}selected{% endif %}>보류</option>
+            </select></div>
+            <div><label>제목</label><input name="title" value="{{ r.title }}" required></div>
+          </div>
+          <div class="form-row"><div><label>내용</label><textarea name="content" required rows="2">{{ r.content }}</textarea></div></div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm btn-primary">저장</button>
+            <button type="button" onclick="cancelEdit('i{{ r.id }}')" class="btn btn-sm btn-secondary">취소</button>
+          </div>
+        </form>
+      </div>
+    {% endfor %}
+    </div>
+    <div class="add-form">
+      <form method="post" action="{{ url_for('write_issue_add') }}">
+        <input type="hidden" name="date" value="{{ sel }}">
+        <div class="form-row col4">
+          <div><label>구분</label><select name="category"><option>장비</option><option>환자</option><option>행정</option><option>기타</option></select></div>
+          <div><label>심각도</label><select name="severity"><option>일반</option><option>중요</option><option>긴급</option></select></div>
+          <div><label>상태</label><select name="status"><option>진행중</option><option>해결</option><option>보류</option></select></div>
+          <div><label>제목</label><input name="title" required placeholder="이슈 제목"></div>
+        </div>
+        <div class="form-row"><div><label>내용</label><textarea name="content" required rows="2" placeholder="상세 내용"></textarea></div></div>
+        <button class="btn btn-sm" style="background:#8e24aa;color:#fff">+ 추가</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- 저장 버튼 -->
+<div style="text-align:center;margin-top:30px;margin-bottom:60px">
+  <a href="{{ url_for('worklog_list') }}"
+     class="btn btn-primary"
+     style="padding:14px 60px;font-size:16px;font-weight:700;border-radius:8px;box-shadow:0 2px 8px rgba(26,115,232,.4)">
+    ✅ 저장 완료
+  </a>
+</div>
+
+<script>
+function toggle(head) {
+  const body = head.nextElementSibling;
+  const arrow = head.querySelector('.toggle');
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  arrow.textContent = isOpen ? '▼' : '▲';
+}
+function editRow(id) {
+  document.getElementById('row-' + id).style.display = 'none';
+  document.getElementById('edit-' + id).style.display = 'block';
+}
+function cancelEdit(id) {
+  document.getElementById('row-' + id).style.display = 'flex';
+  document.getElementById('edit-' + id).style.display = 'none';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block page_title %}📱 On-call 현황{% endblock %}
+{% block content %}
+<div class="table-wrap">
+  <div class="table-header">
+    <h2>On-call 현황</h2>
+    <a href="{{ url_for('oncall_add') }}" class="btn btn-primary">+ 등록</a>
+  </div>
+  <table>
+    <thead>
+      <tr><th>날짜</th><th>모달리티</th><th>담당자</th><th>연락처</th><th>비고</th><th>관리</th></tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td class="text-muted">{{ r.date }}</td>
+        <td><span class="badge badge-info">{{ r.modality }}</span></td>
+        <td><strong>{{ r.staff_name }}</strong></td>
+        <td>{{ r.phone or '-' }}</td>
+        <td>{{ r.note or '-' }}</td>
+        <td>
+          <div class="flex gap-1">
+            <a href="{{ url_for('oncall_edit', id=r.id) }}" class="btn btn-sm btn-secondary">수정</a>
+            <a href="{{ url_for('oncall_delete', id=r.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('삭제?')">삭제</a>
+          </div>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6" style="text-align:center;padding:24px;color:#aaa">등록된 On-call 정보가 없습니다.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

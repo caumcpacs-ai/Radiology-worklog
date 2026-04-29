@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block page_title %}{{ '✏️ On-call 수정' if row else '➕ On-call 등록' }}{% endblock %}
+{% block content %}
+<div class="form-container">
+  <div class="form-title">{{ 'On-call 수정' if row else 'On-call 등록' }}</div>
+  <form method="POST">
+    <div class="grid-2">
+      <div class="form-group">
+        <label>날짜</label>
+        <input type="date" name="date" value="{{ row.date if row else today }}" required>
+      </div>
+      <div class="form-group">
+        <label>모달리티</label>
+        <select name="modality" required>
+          {% for v in ['CT','MRI','일반촬영','초음파','혈관조영','전체'] %}
+          <option value="{{ v }}" {{ 'selected' if row and row.modality==v }}>{{ v }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>담당자</label>
+        <input type="text" name="staff_name" value="{{ row.staff_name if row else '' }}" placeholder="홍길동" required>
+      </div>
+      <div class="form-group">
+        <label>연락처</label>
+        <input type="text" name="phone" value="{{ row.phone if row else '' }}" placeholder="010-0000-0000">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>비고</label>
+      <input type="text" name="note" value="{{ row.note if row else '' }}" placeholder="특이사항">
+    </div>
+    <div class="flex gap-1 mt-2">
+      <button type="submit" class="btn btn-primary">{{ '수정 완료' if row else '등록' }}</button>
+      <a href="{{ url_for('oncall') }}" class="btn btn-secondary">취소</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

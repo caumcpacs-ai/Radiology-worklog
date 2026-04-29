@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>업무일지 {{ date_str }}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'맑은 고딕','Malgun Gothic',sans-serif;font-size:12px;color:#000;background:#fff}
+.print-wrap{max-width:900px;margin:0 auto;padding:20px}
+.print-header{width:100%;border-collapse:collapse;border-bottom:2px solid #000;margin-bottom:16px}
+.print-header td{border:none;padding:0 0 12px 0;vertical-align:middle}
+.print-header-title h1{font-size:22px;font-weight:700;letter-spacing:1px;white-space:nowrap}
+.print-header-title .sub{font-size:12px;color:#444;margin-top:6px;white-space:nowrap}
+.approval-box{border-collapse:collapse;font-size:11px;float:right;width:192px;table-layout:fixed}
+.approval-box th,.approval-box td{border:1px solid #000;text-align:center;padding:0;width:64px}
+.approval-box th{font-weight:600;height:24px;padding:2px 4px;background:#fff}
+.approval-box td{height:50px}
+.section{margin-bottom:16px;break-inside:avoid}
+.section-title{font-size:13px;font-weight:700;background:#1e2a3a;color:#fff;padding:5px 10px;border-radius:3px;margin-bottom:6px}
+.section table{width:100%;border-collapse:collapse;font-size:11px}
+.section th,.section td{border:1px solid #ccc;padding:5px 8px;text-align:left;vertical-align:middle}
+.section th{background:#f0f0f0;font-weight:600;white-space:nowrap}
+.empty{color:#aaa;font-style:italic;padding:6px 0;font-size:11px}
+.print-footer{margin-top:20px;border-top:1px solid #ccc;padding-top:8px;font-size:11px;color:#666;display:flex;justify-content:space-between}
+.no-print{margin-bottom:12px}
+@media print{
+  .no-print{display:none}
+  @page{margin:15mm;size:A4}
+}
+</style>
+</head>
+<body>
+<div class="print-wrap">
+
+  <div class="no-print">
+    <button onclick="window.print()" style="padding:8px 20px;background:#1a73e8;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">🖨️ 인쇄</button>
+    <button onclick="window.close()" style="padding:8px 16px;background:#6c757d;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;margin-left:8px">닫기</button>
+  </div>
+
+  <table class="print-header">
+    <tr>
+      <td class="print-header-title">
+        <h1>영상의학과 업무일지</h1>
+        <div class="sub">{{ date_str }} &nbsp;|&nbsp; 작성일시: {{ now }}</div>
+      </td>
+      <td style="width:192px;padding-left:16px;padding-bottom:12px">
+        <table class="approval-box">
+          <thead>
+            <tr><th>파트장</th><th>팀장</th><th>진료과장</th></tr>
+          </thead>
+          <tbody>
+            <tr><td></td><td></td><td></td></tr>
+          </tbody>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  <!-- 근무자 현황 -->
+  <div class="section">
+    <div class="section-title">👥 근무자 현황</div>
+    {% if roster %}
+    <table><thead><tr><th>근무조</th><th>성명</th><th>직종</th><th>비고</th></tr></thead><tbody>
+    {% for r in roster %}<tr><td>{{ r.shift }}</td><td>{{ r.staff_name }}</td><td>{{ r.role or '-' }}</td><td>{{ r.note or '-' }}</td></tr>{% endfor %}
+    </tbody></table>
+    {% else %}<div class="empty">해당 없음</div>{% endif %}
+  </div>
+
+  <!-- 휴가 현황 -->
+  <div class="section">
+    <div class="section-title">🌴 휴가 현황</div>
+    {% if vacation %}
+    <table><thead><tr><th>성명</th><th>구분</th><th>날짜</th></tr></thead><tbody>
+    {% for r in vacation %}<tr><td>{{ r.staff_name }}</td><td>{{ r.vacation_type }}</td><td>{{ r.start_date }}</td></tr>{% endfor %}
+    </tbody></table>
+    {% else %}<div class="empty">해당 없음</div>{% endif %}
+  </div>
+
+  <!-- On-call -->
+  <div class="section">
+    <div class="section-title">📱 On-call</div>
+    {% if oncall %}
+    <table><thead><tr><th>모달리티</th><th>담당자</th><th>시간</th><th>내용</th></tr></thead><tbody>
+    {% for r in oncall %}<tr><td>{{ r.modality }}</td><td>{{ r.staff_name }}</td><td>{% if r.start_time %}{{ r.start_time }}~{{ r.end_time }}{% else %}-{% endif %}</td><td>{{ r.note or '-' }}</td></tr>{% endfor %}
+    </tbody></table>
+    {% else %}<div class="empty">해당 없음</div>{% endif %}
+  </div>
+
+  <!-- 연장근무 -->
+  <div class="section">
+    <div class="section-title">⏰ 연장근무</div>
+    {% if overtime %}
+    <table><thead><tr><th>성명</th><th>시작</th><th>종료</th><th>시간</th><th>사유</th></tr></thead><tbody>
+    {% for r in overtime %}<tr><td>{{ r.staff_name }}</td><td>{{ r.start_time }}</td><td>{{ r.end_time }}</td><td>{{ r.hours }}h</td><td>{{ r.reason }}</td></tr>{% endfor %}
+    </tbody></table>
+    {% else %}<div class="empty">해당 없음</div>{% endif %}
+  </div>
+
+  <!-- 장비 이력 -->
+  <div class="section">
+    <div class="section-title">🔧 장비 이력</div>
+    {% if equipment %}
+    <table><thead><tr><th>장비</th><th>유형</th><th>내용</th><th>엔지니어</th><th>다운타임</th><th>상태</th></tr></thead><tbody>
+    {% for r in equipment %}<tr><td>{{ r.equipment }}</td><td>{{ r.log_type }}</td><td>{{ r.description }}</td><td>{{ r.engineer or '-' }}</td><td>{{ r.downtime_hours }}h</td><td>{{ r.status }}</td></tr>{% endfor %}
+    </tbody></table>
+    {% else %}<div class="empty">해당 없음</div>{% endif %}
+  </div>
+
+  <!-- 인수인계 -->
+  <div class="section">
+    <div class="section-title">🔄 인수인계</div>
+    {% if handover %}
+    <table><thead><tr><th>근무조</th><th>인계자</th><th>인수자</th><th>우선순위</th><th>내용</th></tr></thead><tbody>
+    {% for r in handover %}<tr><td>{{ r.shift }}</td><td>{{ r.from_person }}</td><td>{{ r.to_person }}</td><td>{{ r.priority }}</td><td>{{ r.content }}</td></tr>{% endfor %}
+    </tbody></table>
+    {% else %}<div class="empty">해당 없음</div>{% endif %}
+  </div>
+
+  <!-- 특이사항·이슈 -->
+  <div class="section">
+    <div class="section-title">⚠️ 특이사항·이슈</div>
+    {% if issues %}
+    <table><thead><tr><th>구분</th><th>심각도</th><th>제목</th><th>내용</th><th>작성자</th><th>상태</th></tr></thead><tbody>
+    {% for r in issues %}<tr><td>{{ r.category }}</td><td>{{ r.severity }}</td><td>{{ r.title }}</td><td>{{ r.content }}</td><td>{{ r.author }}</td><td>{{ r.status }}</td></tr>{% endfor %}
+    </tbody></table>
+    {% else %}<div class="empty">해당 없음</div>{% endif %}
+  </div>
+
+  <div class="print-footer">
+    <span>중앙대학교병원 영상의학과</span>
+    <span>{{ date_str }}</span>
+  </div>
+</div>
+</body>
+</html>

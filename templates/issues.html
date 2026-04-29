@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block page_title %}⚠️ 특이사항·이슈{% endblock %}
+{% block content %}
+<div class="table-wrap">
+  <div class="table-header">
+    <h2>특이사항·이슈 목록</h2>
+    <a href="{{ url_for('issue_add') }}" class="btn btn-primary">+ 신규 등록</a>
+  </div>
+  <table>
+    <thead>
+      <tr><th>날짜</th><th>구분</th><th>심각도</th><th>제목</th><th>내용</th><th>작성자</th><th>상태</th><th>관리</th></tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td class="text-muted">{{ r.date }}</td>
+        <td>{{ r.category }}</td>
+        <td><span class="badge {{ 'badge-danger' if r.severity=='긴급' else 'badge-warning' if r.severity=='중요' else 'badge-secondary' }}">{{ r.severity }}</span></td>
+        <td><strong>{{ r.title }}</strong></td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.content }}</td>
+        <td>{{ r.author }}</td>
+        <td><span class="badge {{ 'badge-danger' if r.status=='진행중' else 'badge-success' if r.status=='해결' else 'badge-secondary' }}">{{ r.status }}</span></td>
+        <td>
+          <div class="flex gap-1">
+            <a href="{{ url_for('issue_edit', id=r.id) }}" class="btn btn-sm btn-secondary">수정</a>
+            <a href="{{ url_for('issue_delete', id=r.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('삭제하시겠습니까?')">삭제</a>
+          </div>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="8" style="text-align:center;padding:24px;color:#aaa">등록된 이슈가 없습니다.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
