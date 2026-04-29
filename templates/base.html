@@ -95,7 +95,7 @@ label{display:block;margin-bottom:4px;font-weight:500;color:#555}
   </div>
   <nav style="flex:1">
     <a href="{{ url_for('dashboard') }}"    class="{{ 'active' if request.endpoint=='dashboard' }}">📊 메인</a>
-    <a href="{{ url_for('write') }}"        class="{{ 'active' if 'write' in request.endpoint }}">✏️ 작성</a>
+    <a href="{{ url_for('write') }}"        class="{{ 'active' if 'write' in request.endpoint }}">✏️ 업무일지 작성</a>
     <a href="{{ url_for('worklog_list') }}" class="{{ 'active' if request.endpoint=='worklog_list' }}">📋 업무일지 리스트</a>
     {% if session.role == 'admin' %}
     <div class="nav-section">관리</div>

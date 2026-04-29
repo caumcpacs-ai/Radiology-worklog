@@ -3,7 +3,7 @@
 Flask + SQLite 기반 내부망 전용
 """
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 import sqlite3
 import os
 import hashlib
@@ -215,45 +215,28 @@ def logout():
 def dashboard():
     today = date.today().isoformat()
     conn = get_db()
-    week_start = (date.today() - timedelta(days=date.today().weekday())).isoformat()
-    week_end   = (date.today() + timedelta(days=6 - date.today().weekday())).isoformat()
 
-    # KPI 카운트
-    issues_open   = conn.execute("SELECT COUNT(*) as cnt FROM issues WHERE status='진행중'").fetchone()['cnt']
-    issues_today  = conn.execute("SELECT COUNT(*) as cnt FROM issues WHERE date=?", (today,)).fetchone()['cnt']
-    handover_today= conn.execute("SELECT COUNT(*) as cnt FROM handover WHERE date=?", (today,)).fetchone()['cnt']
-    equip_active  = conn.execute("SELECT COUNT(*) as cnt FROM equipment_log WHERE status='처리중'").fetchone()['cnt']
-    vacation_week = conn.execute("SELECT COUNT(*) as cnt FROM vacation WHERE start_date<=? AND end_date>=?",
-                                 (week_end, week_start)).fetchone()['cnt']
-    oncall_today  = conn.execute("SELECT * FROM oncall WHERE date=? ORDER BY modality", (today,)).fetchall()
+    # 오늘 데이터 (작성 페이지 7개 섹션 전부)
+    roster_today    = conn.execute("SELECT * FROM staff_roster   WHERE date=? ORDER BY shift, id",      (today,)).fetchall()
+    vacation_today  = conn.execute("SELECT * FROM vacation        WHERE start_date<=? AND end_date>=? ORDER BY staff_name", (today, today)).fetchall()
+    oncall_today    = conn.execute("SELECT * FROM oncall          WHERE date=? ORDER BY modality",       (today,)).fetchall()
+    overtime_today  = conn.execute("SELECT * FROM overtime        WHERE date=? ORDER BY staff_name",     (today,)).fetchall()
+    equipment_today = conn.execute("SELECT * FROM equipment_log   WHERE date=? ORDER BY equipment",      (today,)).fetchall()
+    handover_today  = conn.execute("SELECT * FROM handover        WHERE date=? ORDER BY shift, id",      (today,)).fetchall()
+    issues_today    = conn.execute("SELECT * FROM issues          WHERE date=? ORDER BY severity, id",   (today,)).fetchall()
 
-    # KPI 툴팁용 상세 목록
-    issues_open_rows   = conn.execute("SELECT * FROM issues WHERE status='진행중' ORDER BY severity, date DESC LIMIT 10").fetchall()
-    issues_today_rows  = conn.execute("SELECT * FROM issues WHERE date=? ORDER BY severity", (today,)).fetchall()
-    handover_today_rows= conn.execute("SELECT * FROM handover WHERE date=? ORDER BY shift, id", (today,)).fetchall()
-    equip_active_rows  = conn.execute("SELECT * FROM equipment_log WHERE status='처리중' ORDER BY date DESC LIMIT 10").fetchall()
-    vacation_week_rows = conn.execute("SELECT * FROM vacation WHERE start_date<=? AND end_date>=? ORDER BY start_date",
-                                      (week_end, week_start)).fetchall()
+    # 전체 미해결/처리중 (KPI 툴팁)
+    issues_open_rows  = conn.execute("SELECT * FROM issues WHERE status='진행중' ORDER BY severity, date DESC LIMIT 10").fetchall()
+    equip_active_rows = conn.execute("SELECT * FROM equipment_log WHERE status='처리중' ORDER BY date DESC LIMIT 10").fetchall()
 
-    # 오늘 근무자·휴가 현황
-    roster_today   = conn.execute("SELECT * FROM staff_roster WHERE date=? ORDER BY shift, id", (today,)).fetchall()
-    vacation_today = conn.execute("SELECT * FROM vacation WHERE start_date<=? AND end_date>=? ORDER BY staff_name",
-                                  (today, today)).fetchall()
-
-    # 최근 이슈·인수인계
-    recent_issues   = conn.execute("SELECT * FROM issues ORDER BY created_at DESC LIMIT 5").fetchall()
-    recent_handover = conn.execute("SELECT * FROM handover ORDER BY created_at DESC LIMIT 3").fetchall()
     conn.close()
     return render_template('dashboard.html',
         today=today,
-        issues_today=issues_today, issues_open=issues_open,
-        handover_today=handover_today, equip_active=equip_active,
-        vacation_week=vacation_week, oncall_today=oncall_today,
-        issues_open_rows=issues_open_rows, issues_today_rows=issues_today_rows,
-        handover_today_rows=handover_today_rows, equip_active_rows=equip_active_rows,
-        vacation_week_rows=vacation_week_rows,
         roster_today=roster_today, vacation_today=vacation_today,
-        recent_issues=recent_issues, recent_handover=recent_handover)
+        oncall_today=oncall_today, overtime_today=overtime_today,
+        equipment_today=equipment_today, handover_today=handover_today,
+        issues_today=issues_today,
+        issues_open_rows=issues_open_rows, equip_active_rows=equip_active_rows)
 
 # ════════════════════════════════════════════════════
 # 특이사항·이슈
