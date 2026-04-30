@@ -1,52 +1,273 @@
-{% extends 'base.html' %}
-{% block page_title %}👥 사용자 관리{% endblock %}
+{% extends "base.html" %}
+{% block page_title %}사용자 관리{% endblock %}
 {% block content %}
-<div style="display:grid;grid-template-columns:1fr 340px;gap:16px">
-  <div class="table-wrap">
-    <div class="table-header"><h2>사용자 목록</h2></div>
-    <table>
-      <thead><tr><th>아이디</th><th>이름</th><th>권한</th><th>등록일</th><th>관리</th></tr></thead>
-      <tbody>
-      {% for r in rows %}
-        <tr>
-          <td>{{ r.username }}</td>
-          <td><strong>{{ r.name }}</strong></td>
-          <td><span class="badge {{ 'badge-danger' if r.role=='admin' else 'badge-secondary' }}">{{ '관리자' if r.role=='admin' else '사용자' }}</span></td>
-          <td class="text-muted">{{ r.created_at[:10] }}</td>
-          <td>
-            {% if r.username != 'admin' %}
-            <a href="{{ url_for('user_delete', id=r.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('삭제?')">삭제</a>
-            {% endif %}
-          </td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  <div class="card">
-    <div class="card-title">➕ 사용자 추가</div>
-    <form method="POST" action="{{ url_for('user_add') }}">
-      <div class="form-group">
-        <label>아이디</label>
-        <input type="text" name="username" placeholder="로그인 아이디" required>
-      </div>
-      <div class="form-group">
-        <label>이름</label>
-        <input type="text" name="name" placeholder="실명" required>
-      </div>
-      <div class="form-group">
-        <label>비밀번호</label>
-        <input type="password" name="password" placeholder="초기 비밀번호" required>
-      </div>
-      <div class="form-group">
-        <label>권한</label>
-        <select name="role">
-          <option value="user">일반 사용자</option>
-          <option value="admin">관리자</option>
-        </select>
-      </div>
-      <button type="submit" class="btn btn-primary" style="width:100%">추가</button>
-    </form>
-  </div>
+<style>
+.filter-bar{display:flex;gap:12px;align-items:center;margin-bottom:16px;background:#fff;padding:12px 16px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+.filter-bar label{display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;font-weight:500}
+.filter-bar input[type=radio]{width:auto}
+.user-table th{background:#f0f4ff;font-size:12px;padding:7px 10px}
+.user-table td{padding:8px 10px;vertical-align:middle;font-size:13px}
+.vc-table th{background:#fff3e0;font-size:12px;padding:7px 10px}
+.vc-table td{padding:8px 10px;vertical-align:middle;font-size:13px}
+.edit-form-row{background:#f0f4ff;display:none}
+.edit-form-row td{padding:10px}
+button:disabled{opacity:.4;cursor:not-allowed}
+</style>
+
+<!-- 재직자/퇴사자/전체 필터 -->
+<div class="filter-bar">
+  <span style="font-weight:700;margin-right:4px">조회:</span>
+  <label><input type="radio" name="f" value="재직자" onchange="applyFilter(this.value)" {{ 'checked' if current_filter=='재직자' }}> 재직자</label>
+  <label><input type="radio" name="f" value="퇴사자" onchange="applyFilter(this.value)" {{ 'checked' if current_filter=='퇴사자' }}> 퇴사자</label>
+  <label><input type="radio" name="f" value="전체" onchange="applyFilter(this.value)" {{ 'checked' if current_filter=='전체' }}> 전체</label>
 </div>
+
+<!-- 사용자 목록 -->
+<div class="table-wrap" style="margin-bottom:24px">
+  <div class="table-header">
+    <h2>사용자 목록 ({{ rows|length }}명)</h2>
+    {% if session.role == 'admin' %}
+    <button class="btn btn-primary btn-sm" onclick="toggleRowEdit('add-user-row')">+ 사용자 추가</button>
+    {% else %}
+    <button class="btn btn-primary btn-sm" disabled title="관리자만 사용 가능">+ 사용자 추가</button>
+    {% endif %}
+  </div>
+  <table class="user-table">
+    <thead>
+      <tr>
+        <th>사번 (아이디)</th>
+        <th>이름</th>
+        <th>파트</th>
+        <th>권한</th>
+        <th>입사일자</th>
+        <th>퇴사일자</th>
+        <th>등록일</th>
+        <th>관리</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- 추가 폼 행 -->
+      <tr id="add-user-row" style="display:none;background:#f0f8ff">
+        <td colspan="8">
+          <form method="post" action="/users/add" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
+            <div style="flex:1;min-width:100px">
+              <label style="font-size:11px;font-weight:600;color:#555">사번 (아이디)</label>
+              <input type="text" name="username" placeholder="사번 입력" required>
+            </div>
+            <div style="flex:1;min-width:100px">
+              <label style="font-size:11px;font-weight:600;color:#555">이름</label>
+              <input type="text" name="name" placeholder="이름" required>
+            </div>
+            <div style="flex:0;min-width:80px">
+              <label style="font-size:11px;font-weight:600;color:#555">파트</label>
+              <select name="part">
+                <option value="">-</option>
+                {% for p in parts %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+              </select>
+            </div>
+            <div style="flex:0;min-width:80px">
+              <label style="font-size:11px;font-weight:600;color:#555">권한</label>
+              <select name="role">
+                <option value="user">사용자</option>
+                <option value="admin">관리자</option>
+              </select>
+            </div>
+            <div style="flex:1;min-width:120px">
+              <label style="font-size:11px;font-weight:600;color:#555">비밀번호</label>
+              <input type="password" name="password" placeholder="초기 비밀번호" required>
+            </div>
+            <div style="flex:0;min-width:110px">
+              <label style="font-size:11px;font-weight:600;color:#555">입사일자</label>
+              <input type="date" name="hire_date">
+            </div>
+            <div style="flex:0;min-width:110px">
+              <label style="font-size:11px;font-weight:600;color:#555">퇴사일자</label>
+              <input type="date" name="retired_date">
+            </div>
+            <div style="flex:0">
+              <label style="font-size:11px">&nbsp;</label>
+              <button class="btn btn-primary" type="submit">추가</button>
+            </div>
+          </form>
+        </td>
+      </tr>
+      {% for r in rows %}
+      <tr>
+        <td>{{ r.username }}</td>
+        <td>{{ r.name }}</td>
+        <td>{{ r.part or '-' }}</td>
+        <td><span class="badge {{ 'badge-danger' if r.role=='admin' else 'badge-info' }}">{{ '관리자' if r.role=='admin' else '사용자' }}</span></td>
+        <td>{{ r.hire_date or '-' }}</td>
+        <td>{{ r.retired_date or '-' }}</td>
+        <td style="font-size:11px;color:#888">{{ r.created_at[:10] if r.created_at else '-' }}</td>
+        <td>
+          <div style="display:flex;gap:4px">
+            {% if session.role == 'admin' %}
+            <button class="btn btn-sm btn-warning" onclick="toggleRowEdit('edit-{{ r.id }}')">수정</button>
+            {% if r.username != 'admin' %}
+            <form method="post" action="/users/delete/{{ r.id }}" style="display:inline" onsubmit="return confirm('삭제하시겠습니까?')">
+              <button class="btn btn-sm btn-danger">삭제</button>
+            </form>
+            {% endif %}
+            {% else %}
+            <button class="btn btn-sm btn-warning" disabled title="관리자만 사용 가능">수정</button>
+            <button class="btn btn-sm btn-danger" disabled title="관리자만 사용 가능">삭제</button>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      <tr id="edit-{{ r.id }}" style="display:none;background:#fffde7">
+        <td colspan="8">
+          <form method="post" action="/users/edit/{{ r.id }}" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
+            <input type="hidden" name="current_filter" value="{{ current_filter }}">
+            <div style="flex:1;min-width:100px">
+              <label style="font-size:11px;font-weight:600;color:#555">이름</label>
+              <input type="text" name="name" value="{{ r.name }}" required>
+            </div>
+            <div style="flex:0;min-width:80px">
+              <label style="font-size:11px;font-weight:600;color:#555">파트</label>
+              <select name="part">
+                <option value="">-</option>
+                {% for p in parts %}<option value="{{ p }}" {{ 'selected' if r.part==p }}>{{ p }}</option>{% endfor %}
+              </select>
+            </div>
+            <div style="flex:0;min-width:80px">
+              <label style="font-size:11px;font-weight:600;color:#555">권한</label>
+              <select name="role">
+                <option value="user" {{ 'selected' if r.role=='user' }}>사용자</option>
+                <option value="admin" {{ 'selected' if r.role=='admin' }}>관리자</option>
+              </select>
+            </div>
+            <div style="flex:0;min-width:110px">
+              <label style="font-size:11px;font-weight:600;color:#555">입사일자</label>
+              <input type="date" name="hire_date" value="{{ r.hire_date or '' }}">
+            </div>
+            <div style="flex:0;min-width:110px">
+              <label style="font-size:11px;font-weight:600;color:#555">퇴사일자</label>
+              <input type="date" name="retired_date" value="{{ r.retired_date or '' }}">
+            </div>
+            <div style="flex:0">
+              <label style="font-size:11px">&nbsp;</label>
+              <button class="btn btn-primary" type="submit">저장</button>
+              <button type="button" class="btn btn-secondary" onclick="toggleRowEdit('edit-{{ r.id }}')">취소</button>
+            </div>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- 휴가 코드 관리 -->
+<div class="table-wrap">
+  <div class="table-header">
+    <h2>휴가 코드 관리</h2>
+    {% if session.role == 'admin' %}
+    <button class="btn btn-primary btn-sm" onclick="toggleRowEdit('add-vc-row')">+ 코드 추가</button>
+    {% else %}
+    <button class="btn btn-primary btn-sm" disabled title="관리자만 사용 가능">+ 코드 추가</button>
+    {% endif %}
+  </div>
+  <table class="vc-table">
+    <thead>
+      <tr>
+        <th>코드</th>
+        <th>근무정보</th>
+        <th>출근시간</th>
+        <th>퇴근시간</th>
+        <th>관리</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- 추가 폼 행 -->
+      <tr id="add-vc-row" style="display:none;background:#fff8e1">
+        <td colspan="5">
+          <form method="post" action="/users/vacation_code/add" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
+            <div style="flex:1;min-width:80px">
+              <label style="font-size:11px;font-weight:600;color:#555">코드</label>
+              <input type="text" name="code" placeholder="코드 (예: 연차)" required>
+            </div>
+            <div style="flex:2;min-width:140px">
+              <label style="font-size:11px;font-weight:600;color:#555">근무정보</label>
+              <input type="text" name="work_info" placeholder="근무정보">
+            </div>
+            <div style="flex:0;min-width:100px">
+              <label style="font-size:11px;font-weight:600;color:#555">출근시간</label>
+              <input type="time" name="start_time">
+            </div>
+            <div style="flex:0;min-width:100px">
+              <label style="font-size:11px;font-weight:600;color:#555">퇴근시간</label>
+              <input type="time" name="end_time">
+            </div>
+            <div style="flex:0">
+              <label style="font-size:11px">&nbsp;</label>
+              <button class="btn btn-primary" type="submit">추가</button>
+            </div>
+          </form>
+        </td>
+      </tr>
+      {% for vc in vacation_codes %}
+      <tr>
+        <td>{{ vc.code }}</td>
+        <td>{{ vc.work_info }}</td>
+        <td>{{ vc.start_time }}</td>
+        <td>{{ vc.end_time }}</td>
+        <td>
+          <div style="display:flex;gap:4px">
+            {% if session.role == 'admin' %}
+            <button class="btn btn-sm btn-warning" onclick="toggleRowEdit('vc-edit-{{ vc.id }}')">수정</button>
+            <form method="post" action="/users/vacation_code/delete/{{ vc.id }}" style="display:inline" onsubmit="return confirm('삭제하시겠습니까?')">
+              <button class="btn btn-sm btn-danger">삭제</button>
+            </form>
+            {% else %}
+            <button class="btn btn-sm btn-warning" disabled title="관리자만 사용 가능">수정</button>
+            <button class="btn btn-sm btn-danger" disabled title="관리자만 사용 가능">삭제</button>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      <tr id="vc-edit-{{ vc.id }}" style="display:none;background:#fff8e1">
+        <td colspan="5">
+          <form method="post" action="/users/vacation_code/edit/{{ vc.id }}" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
+            <div style="flex:1;min-width:80px">
+              <label style="font-size:11px;font-weight:600;color:#555">코드</label>
+              <input type="text" name="code" value="{{ vc.code }}" required>
+            </div>
+            <div style="flex:2;min-width:140px">
+              <label style="font-size:11px;font-weight:600;color:#555">근무정보</label>
+              <input type="text" name="work_info" value="{{ vc.work_info }}">
+            </div>
+            <div style="flex:0;min-width:100px">
+              <label style="font-size:11px;font-weight:600;color:#555">출근시간</label>
+              <input type="time" name="start_time" value="{{ vc.start_time }}">
+            </div>
+            <div style="flex:0;min-width:100px">
+              <label style="font-size:11px;font-weight:600;color:#555">퇴근시간</label>
+              <input type="time" name="end_time" value="{{ vc.end_time }}">
+            </div>
+            <div style="flex:0">
+              <label style="font-size:11px">&nbsp;</label>
+              <button class="btn btn-primary" type="submit">저장</button>
+              <button type="button" class="btn btn-secondary" onclick="toggleRowEdit('vc-edit-{{ vc.id }}')">취소</button>
+            </div>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" style="text-align:center;color:#aaa;padding:16px">등록된 휴가 코드가 없습니다.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+function applyFilter(val) {
+  location.href = '/users?filter=' + encodeURIComponent(val);
+}
+function toggleRowEdit(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+}
+</script>
 {% endblock %}

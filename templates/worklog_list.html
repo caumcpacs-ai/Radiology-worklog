@@ -1,129 +1,150 @@
-{% extends 'base.html' %}
-{% block page_title %}📋 업무일지 리스트{% endblock %}
+{% extends "base.html" %}
+{% block page_title %}업무일지 리스트{% endblock %}
 {% block content %}
 <style>
-.log-table th, .log-table td { text-align:center; }
-.log-table td:first-child { text-align:left; font-weight:600; }
-.log-table td:last-child { text-align:center; white-space:nowrap; }
-.dot { display:inline-block; width:22px; height:22px; border-radius:50%; font-size:11px; line-height:22px; font-weight:700; }
-.dot.filled  { background:#1a73e8; color:#fff; }
-.dot.empty   { background:#eee; color:#aaa; }
-.badge-submitted { background:#e8f5e9; color:#2e7d32; border:1px solid #a5d6a7; font-size:11px; padding:2px 7px; border-radius:10px; font-weight:600; }
-.badge-rejected  { background:#fdecea; color:#c62828; border:1px solid #ffcdd2; font-size:11px; padding:2px 7px; border-radius:10px; font-weight:600; }
-/* 반려 모달 */
-#rejectModal { display:none; position:fixed; top:0; left:0; width:100%; height:100%;
-  background:rgba(0,0,0,.5); z-index:9999; justify-content:center; align-items:center; }
-.modal-box { background:#fff; border-radius:10px; padding:28px; min-width:340px; max-width:420px;
-  box-shadow:0 8px 32px rgba(0,0,0,.2); }
-.modal-box h3 { margin-bottom:8px; font-size:16px; color:#1e2a3a; }
-.modal-box .modal-date { color:#555; font-size:13px; margin-bottom:18px; }
-.modal-box label { font-size:13px; font-weight:600; display:block; margin-bottom:6px; }
-.modal-box select { width:100%; padding:9px 10px; border:1px solid #ddd; border-radius:6px; font-size:14px; }
-.modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:20px; }
+.wl-table th{background:#f0f4ff;font-size:12px;padding:7px 10px}
+.wl-table td{padding:8px 10px;vertical-align:middle}
+.count-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#1a73e8;margin-right:2px}
+.count-dot.empty{background:#ddd}
+.btn-group{display:flex;gap:4px;flex-wrap:wrap}
+.btn-disabled{opacity:.4;pointer-events:none}
 </style>
 
 <div class="table-wrap">
   <div class="table-header">
-    <h2>업무일지 리스트</h2>
-    <a href="{{ url_for('write') }}" class="btn btn-primary">+ 오늘 작성</a>
+    <h2>업무일지 목록</h2>
   </div>
-  {% if logs %}
-  <table class="log-table">
+  <table class="wl-table">
     <thead>
       <tr>
         <th>날짜</th>
         <th>상태</th>
-        <th>👥 근무자</th>
-        <th>🌴 휴가</th>
-        <th>📱 On-call</th>
-        <th>⏰ 연장근무</th>
-        <th>🔧 장비이력</th>
-        <th>🔄 인수인계</th>
-        <th>⚠️ 이슈</th>
+        <th>작성자</th>
+        <th>근무자</th>
+        <th>휴가</th>
+        <th>On-call</th>
+        <th>연장</th>
+        <th>장비</th>
+        <th>이슈</th>
         <th>관리</th>
       </tr>
     </thead>
     <tbody>
     {% for log in logs %}
-      <tr>
-        <td>{{ log.date }}</td>
-        <td>
-          {% if log.rejected %}
-            <span class="badge-rejected">반려 ({{ log.rejected_by }})</span>
-          {% else %}
-            <span class="badge-submitted">제출</span>
-          {% endif %}
-        </td>
-        <td><span class="dot {{ 'filled' if log.roster    else 'empty' }}">{{ log.roster    or '-' }}</span></td>
-        <td><span class="dot {{ 'filled' if log.vacation  else 'empty' }}">{{ log.vacation  or '-' }}</span></td>
-        <td><span class="dot {{ 'filled' if log.oncall    else 'empty' }}">{{ log.oncall    or '-' }}</span></td>
-        <td><span class="dot {{ 'filled' if log.overtime  else 'empty' }}">{{ log.overtime  or '-' }}</span></td>
-        <td><span class="dot {{ 'filled' if log.equipment else 'empty' }}">{{ log.equipment or '-' }}</span></td>
-        <td><span class="dot {{ 'filled' if log.handover  else 'empty' }}">{{ log.handover  or '-' }}</span></td>
-        <td><span class="dot {{ 'filled' if log.issues    else 'empty' }}">{{ log.issues    or '-' }}</span></td>
-        <td>
-          {# 관리자: 수정 / 인쇄 / 반려(취소) #}
+    <tr>
+      <td><a href="/write?date={{ log.date }}" style="font-weight:600;color:#1a73e8">{{ log.date }}</a></td>
+      <td>
+        {% if log.wl_status == '제출' %}
+          <span class="badge badge-info">제출</span>
+        {% elif log.wl_status == '확정' %}
+          <span class="badge badge-success">확정</span>
+        {% elif log.wl_status == '반려' %}
+          <span class="badge badge-danger">반려</span>
+          <span class="text-muted" style="font-size:11px">→ {{ log.rejected_to }}</span>
+        {% elif log.wl_status == '저장' %}
+          <span class="badge badge-secondary">저장</span>
+        {% elif log.wl_status == '회수' %}
+          <span class="badge badge-warning">회수</span>
+        {% endif %}
+      </td>
+      <td style="font-size:12px;color:#555">{{ log.submitted_by_name }}</td>
+      <td><span class="{{ '' if log.roster > 0 else 'text-muted' }}">{{ log.roster }}</span></td>
+      <td><span class="{{ '' if log.vacation > 0 else 'text-muted' }}">{{ log.vacation }}</span></td>
+      <td><span class="{{ '' if log.oncall > 0 else 'text-muted' }}">{{ log.oncall }}</span></td>
+      <td><span class="{{ '' if log.overtime > 0 else 'text-muted' }}">{{ log.overtime }}</span></td>
+      <td><span class="{{ '' if log.equipment > 0 else 'text-muted' }}">{{ log.equipment }}</span></td>
+      <td><span class="{{ '' if log.issues > 0 else 'text-muted' }}">{{ log.issues }}</span></td>
+      <td>
+        <div class="btn-group">
           {% if session.role == 'admin' %}
-            <a href="{{ url_for('write', date=log.date) }}" class="btn btn-sm btn-primary">수정</a>
-            <a href="{{ url_for('print_view', date_str=log.date) }}" target="_blank" class="btn btn-sm btn-secondary">인쇄</a>
-            {% if log.rejected %}
-              <a href="{{ url_for('worklog_unreject', date_str=log.date) }}" class="btn btn-sm btn-success"
-                 onclick="return confirm('반려를 취소하시겠습니까?')">반려취소</a>
-            {% else %}
-              <button type="button" onclick="openRejectModal('{{ log.date }}')"
-                      class="btn btn-sm btn-warning">반려</button>
+            {# 관리자 버튼 #}
+            {% if log.wl_status in ('제출', '반려', '회수', '저장') %}
+              <a href="/write?date={{ log.date }}" class="btn btn-sm btn-warning">수정</a>
             {% endif %}
-          {# 사용자: 반려된 경우 수정 + 인쇄 #}
-          {% elif log.rejected %}
-            <a href="{{ url_for('write', date=log.date) }}" class="btn btn-sm btn-primary">수정</a>
-            <a href="{{ url_for('print_view', date_str=log.date) }}" target="_blank" class="btn btn-sm btn-secondary">인쇄</a>
-          {# 사용자 + 정상: 인쇄만 #}
+            {% if log.wl_status == '제출' %}
+              <button class="btn btn-sm btn-danger" onclick="openRejectModal('{{ log.date }}','{{ log.submitted_by }}')">반려</button>
+              <form method="post" action="/worklog/confirm/{{ log.date }}" style="display:inline" onsubmit="return confirm('확정하시겠습니까?')">
+                <button class="btn btn-sm btn-success">확정</button>
+              </form>
+            {% endif %}
+            <a href="/print/{{ log.date }}" target="_blank" class="btn btn-sm btn-secondary">인쇄</a>
+            {% if log.wl_status == '확정' %}
+              <form method="post" action="/worklog/unconfirm/{{ log.date }}" style="display:inline" onsubmit="return confirm('확정을 취소하고 제출 상태로 되돌리겠습니까?')">
+                <button class="btn btn-sm btn-danger">취소</button>
+              </form>
+            {% endif %}
           {% else %}
-            <a href="{{ url_for('print_view', date_str=log.date) }}" target="_blank" class="btn btn-sm btn-secondary">인쇄</a>
+            {# 사용자 버튼 #}
+            {% if log.wl_status == '저장' %}
+              <a href="/write?date={{ log.date }}" class="btn btn-sm btn-warning">수정</a>
+              <form method="post" action="/worklog/submit/{{ log.date }}" style="display:inline" onsubmit="return confirm('제출하시겠습니까?')">
+                <button class="btn btn-sm btn-primary">제출</button>
+              </form>
+            {% elif log.wl_status == '제출' %}
+              <form method="post" action="/worklog/withdraw/{{ log.date }}" style="display:inline" onsubmit="return confirm('회수하시겠습니까?')">
+                <button class="btn btn-sm btn-warning">회수</button>
+              </form>
+              <a href="/print/{{ log.date }}" target="_blank" class="btn btn-sm btn-secondary">인쇄</a>
+            {% elif log.wl_status == '확정' %}
+              <button class="btn btn-sm btn-success btn-disabled">확정</button>
+              <a href="/print/{{ log.date }}" target="_blank" class="btn btn-sm btn-secondary">인쇄</a>
+            {% elif log.wl_status == '반려' %}
+              <a href="/write?date={{ log.date }}" class="btn btn-sm btn-warning">수정</a>
+              <form method="post" action="/worklog/submit/{{ log.date }}" style="display:inline" onsubmit="return confirm('재제출하시겠습니까?')">
+                <button class="btn btn-sm btn-primary">재제출</button>
+              </form>
+              <button class="btn btn-sm btn-success btn-disabled">확정</button>
+              <a href="/print/{{ log.date }}" target="_blank" class="btn btn-sm btn-secondary">인쇄</a>
+            {% elif log.wl_status == '회수' %}
+              <a href="/write?date={{ log.date }}" class="btn btn-sm btn-warning">수정</a>
+            {% endif %}
           {% endif %}
-        </td>
-      </tr>
+        </div>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="10" style="text-align:center;color:#aaa;padding:24px">표시할 업무일지가 없습니다.</td></tr>
     {% endfor %}
     </tbody>
   </table>
-  {% else %}
-  <p class="text-muted" style="padding:24px">제출된 업무일지가 없습니다. <a href="{{ url_for('write') }}">작성하기</a></p>
-  {% endif %}
 </div>
 
-{# 반려 모달 (관리자 전용) #}
+<!-- 반려 모달 (관리자) -->
 {% if session.role == 'admin' %}
-<div id="rejectModal">
-  <div class="modal-box">
-    <h3>업무일지 반려</h3>
-    <p class="modal-date" id="rejectModalDate"></p>
-    <form id="rejectForm" method="post">
-      <label>반려 대상 사용자 선택</label>
-      <select name="target_user" id="rejectUserSelect">
-        {% for u in users %}
-        <option value="{{ u.username }}">{{ u.name }} ({{ u.username }})</option>
-        {% endfor %}
-      </select>
-      <div class="modal-actions">
-        <button type="button" onclick="closeRejectModal()" class="btn btn-secondary">취소</button>
-        <button type="submit" class="btn btn-warning"
-                onclick="return confirm('선택한 사용자에게 반려하시겠습니까?')">반려 확인</button>
+<div id="rejectModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:500;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:8px;padding:24px;width:360px;box-shadow:0 4px 20px rgba(0,0,0,.2)">
+    <h3 style="margin-bottom:16px;font-size:15px">반려 처리</h3>
+    <form method="post" id="rejectForm">
+      <div class="form-group">
+        <label>반려 대상 (사용자)</label>
+        <select name="target_user" style="width:100%">
+          {% for u in users %}
+          <option value="{{ u.username }}">{{ u.name }} ({{ u.username }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+        <button type="button" class="btn btn-secondary" onclick="closeRejectModal()">취소</button>
+        <button type="submit" class="btn btn-danger">반려</button>
       </div>
     </form>
   </div>
 </div>
+
 <script>
-function openRejectModal(dateStr) {
-  document.getElementById('rejectModalDate').textContent = dateStr + ' 업무일지를 반려합니다.';
-  document.getElementById('rejectForm').action = '/worklog/reject/' + dateStr;
-  document.getElementById('rejectModal').style.display = 'flex';
+function openRejectModal(date, submittedBy) {
+  document.getElementById('rejectForm').action = '/worklog/reject/' + date;
+  const modal = document.getElementById('rejectModal');
+  modal.style.display = 'flex';
+  // 작성자 선택
+  const sel = modal.querySelector('select[name=target_user]');
+  for (let opt of sel.options) {
+    if (opt.value === submittedBy) { opt.selected = true; break; }
+  }
 }
 function closeRejectModal() {
   document.getElementById('rejectModal').style.display = 'none';
 }
-document.getElementById('rejectModal').addEventListener('click', function(e) {
-  if (e.target === this) closeRejectModal();
-});
 </script>
 {% endif %}
 {% endblock %}

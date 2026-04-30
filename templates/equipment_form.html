@@ -1,8 +1,8 @@
-{% extends 'base.html' %}
-{% block page_title %}{{ '✏️ 장비 이력 수정' if row else '➕ 장비 이력 등록' }}{% endblock %}
+{% extends "base.html" %}
+{% block page_title %}{{ '장비 이력 수정' if row else '장비 이력 등록' }}{% endblock %}
 {% block content %}
 <div class="form-container">
-  <div class="form-title">{{ '장비 이력 수정' if row else '장비 고장·점검 등록' }}</div>
+  <div class="form-title">{{ '장비 이력 수정' if row else '장비 이력 등록' }}</div>
   <form method="POST">
     <div class="grid-2">
       <div class="form-group">
@@ -10,23 +10,19 @@
         <input type="date" name="date" value="{{ row.date if row else today }}" required>
       </div>
       <div class="form-group">
-        <label>장비</label>
-        <select name="equipment" required>
-          {% for v in ['CT 1호기','CT 2호기','MRI 1호기','MRI 2호기','MRI 3호기','일반촬영 1','일반촬영 2','일반촬영 3','형광투시','맘모','골밀도','초음파 1','초음파 2','혈관조영','PACS','기타'] %}
-          <option value="{{ v }}" {{ 'selected' if row and row.equipment==v }}>{{ v }}</option>
-          {% endfor %}
-        </select>
+        <label>장비명</label>
+        <input type="text" name="equipment_name" value="{{ row.equipment_name if row else '' }}" placeholder="장비명" required>
       </div>
       <div class="form-group">
         <label>유형</label>
         <select name="log_type" required>
-          {% for v in ['고장','점검','수리완료','PM(예방정비)','업그레이드','기타'] %}
+          {% for v in ['고장','점검','수리완료','PM'] %}
           <option value="{{ v }}" {{ 'selected' if row and row.log_type==v }}>{{ v }}</option>
           {% endfor %}
         </select>
       </div>
       <div class="form-group">
-        <label>처리 상태</label>
+        <label>상태</label>
         <select name="status">
           {% for v in ['처리중','완료'] %}
           <option value="{{ v }}" {{ 'selected' if row and row.status==v }}>{{ v }}</option>
@@ -34,21 +30,29 @@
         </select>
       </div>
       <div class="form-group">
-        <label>담당 엔지니어</label>
-        <input type="text" name="engineer" value="{{ row.engineer if row else '' }}" placeholder="엔지니어 이름 또는 업체">
+        <label>엔지니어</label>
+        <input type="text" name="engineer" value="{{ row.engineer if row else '' }}" placeholder="엔지니어 이름">
       </div>
       <div class="form-group">
-        <label>장비 중단 시간 (시간)</label>
-        <input type="number" name="downtime_hours" value="{{ row.downtime_hours if row else 0 }}" min="0" step="0.5" placeholder="0">
+        <label>시작 시간</label>
+        <input type="time" name="start_time" value="{{ row.start_time if row else '' }}">
+      </div>
+      <div class="form-group">
+        <label>종료 시간</label>
+        <input type="time" name="end_time" value="{{ row.end_time if row else '' }}">
+      </div>
+      <div class="form-group">
+        <label>다운타임</label>
+        <input type="text" name="downtime" value="{{ row.downtime if row else '' }}" placeholder="예) 2h">
       </div>
     </div>
     <div class="form-group">
-      <label>상세 내용</label>
-      <textarea name="description" rows="5" placeholder="증상, 조치 내용, 부품 교체 등 상세히 입력" required>{{ row.description if row else '' }}</textarea>
+      <label>내용</label>
+      <textarea name="description" rows="4" placeholder="내용">{{ row.description if row else '' }}</textarea>
     </div>
     <div class="flex gap-1 mt-2">
       <button type="submit" class="btn btn-primary">{{ '수정 완료' if row else '등록' }}</button>
-      <a href="{{ url_for('equipment') }}" class="btn btn-secondary">취소</a>
+      <a href="{{ url_for('write') }}" class="btn btn-secondary">취소</a>
     </div>
   </form>
 </div>
