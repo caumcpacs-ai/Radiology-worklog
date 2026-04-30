@@ -1,0 +1,273 @@
+================================================================================
+영상의학과 업무일지 웹앱 개발 대화 기록
+작성일: 2026-04-29
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【 /compact 요약본 (이전 대화 세션) 】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+■ 사용자 요청 순서
+
+1. radiology_worklog 폴더 파일을 https://github.com/caumcpacs-ai/radiology-worklog.git 에 업로드
+   → 이미 동기화 상태, 추가 작업 없음
+
+2. https://github.com/caumcpacs-ai/Radiology-worklog.git (대문자 R) 새 저장소에 업로드
+   → remote URL 변경 후 push 완료
+
+3. 저장/제출 분리
+   - 저장: 데이터만 DB 저장, 업무일지 리스트에 미표시
+   - 제출: 리스트에 표시
+   - 관리자 반려 시 대상 사용자 선택 가능
+
+4. 저장 팝업 구현
+   - 저장 버튼 하나로 통합
+   - 팝업: "업무일지가 저장되었습니다. 제출하시겠습니까?"
+   - 예 → 제출 / 아니오 → 현재 페이지 유지
+
+5. 대시보드 KPI 툴팁
+   - KPI 제목에 커서 올리면 카운트 항목 상세 툴팁 표시
+
+6. 대시보드 하단 섹션 추가
+   - 근무자현황, 휴가현황 추가
+
+7. 대시보드 전면 개편
+   - "이번주 휴가" → "오늘 휴가"
+   - 장비이력 추가
+   - 작성 페이지의 7개 섹션 전부 대시보드에 표시
+   - 사이드바 "작성" → "업무일지 작성"으로 변경
+
+8. 문서화
+   - README.md 업데이트
+   - CLAUDE.md 생성 (README와 동일 내용)
+   - 이후 두 파일 항상 동기화 유지
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+■ 주요 기술 사항
+
+- Flask + SQLite (포트 1000, host='0.0.0.0')
+- Jinja2 템플릿 ({% extends 'base.html' %})
+- SQLite ALTER TABLE 마이그레이션 (try/except 호환성 처리)
+- 역할 기반 접근 제어: session.role == 'admin'
+- worklog_status 테이블:
+    date PK, status, submitted_by, submitted_at,
+    rejected_by, rejected_to, rejected_at
+- JavaScript confirm() 다이얼로그로 저장/제출 결정
+- CSS hover 툴팁: .kpi-tooltip (display:none → display:block on :hover)
+- 관리자 반려 시 사용자 선택 CSS 모달 오버레이
+- Jinja2 |length 필터로 KPI 카운트
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+■ 주요 파일 및 코드 변경 내용
+
+▶ app.py 주요 변경
+
+[worklog_status 테이블 CREATE]
+    CREATE TABLE IF NOT EXISTS worklog_status (
+        date TEXT PRIMARY KEY,
+        status TEXT DEFAULT '제출',
+        submitted_by TEXT DEFAULT '',
+        submitted_at TEXT DEFAULT '',
+        rejected_by TEXT DEFAULT '',
+        rejected_to TEXT DEFAULT '',
+        rejected_at TEXT DEFAULT ''
+    )
+
+[마이그레이션 (init_db 내)]
+    for col in ['submitted_by', 'submitted_at', 'rejected_to']:
+        try:
+            c.execute(f"ALTER TABLE worklog_status ADD COLUMN {col} TEXT DEFAULT ''")
+        except Exception:
+            pass
+    try:
+        c.execute("ALTER TABLE worklog_status ADD COLUMN rejected_at TEXT DEFAULT ''")
+    except Exception:
+        pass
+
+[write() 라우트 - wl_status 추가]
+    ws = conn.execute("SELECT status, submitted_by FROM worklog_status WHERE date=?", (sel,)).fetchone()
+    wl_status = ws['status'] if ws else None
+    return render_template('write.html', sel=sel, wl_status=wl_status, **data)
+
+[worklog_submit 라우트 (신규)]
+    @app.route('/worklog/submit/<date_str>', methods=['POST'])
+    @login_required
+    def worklog_submit(date_str):
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        conn = get_db()
+        conn.execute("""INSERT OR REPLACE INTO worklog_status
+            (date, status, submitted_by, submitted_at, rejected_by, rejected_to, rejected_at)
+            VALUES (?, '제출', ?, ?, '', '', '')""",
+            (date_str, session['user'], now))
+        conn.commit(); conn.close()
+        flash(f'{date_str} 업무일지가 제출되었습니다.', 'success')
+        return redirect(url_for('worklog_list'))
+
+[worklog_list() - 권한별 필터링]
+    if session.get('role') == 'admin':
+        statuses = conn.execute("SELECT * FROM worklog_status ORDER BY date DESC").fetchall()
+        users = conn.execute("SELECT username, name FROM users ORDER BY name").fetchall()
+    else:
+        statuses = conn.execute("""SELECT * FROM worklog_status
+            WHERE (status='제출' AND submitted_by=?)
+               OR (status='반려' AND rejected_to=?)
+            ORDER BY date DESC""", (session['user'], session['user'])).fetchall()
+        users = []
+
+[worklog_reject - POST 방식, target_user 추가]
+    @app.route('/worklog/reject/<date_str>', methods=['POST'])
+    def worklog_reject(date_str):
+        target_user = request.form.get('target_user', '')
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        conn.execute("""UPDATE worklog_status
+            SET status='반려', rejected_by=?, rejected_to=?, rejected_at=?
+            WHERE date=?""", (session['name'], target_user, now, date_str))
+
+[worklog_unreject - '제출' 상태로 초기화]
+    conn.execute("""UPDATE worklog_status
+        SET status='제출', rejected_by='', rejected_to='', rejected_at=''
+        WHERE date=?""", (date_str,))
+
+[dashboard() 라우트 - 오늘 기준 7개 섹션 전부 조회]
+    roster_today    = conn.execute("SELECT * FROM staff_roster   WHERE date=? ORDER BY shift, id", (today,)).fetchall()
+    vacation_today  = conn.execute("SELECT * FROM vacation        WHERE start_date<=? AND end_date>=? ORDER BY staff_name", (today, today)).fetchall()
+    oncall_today    = conn.execute("SELECT * FROM oncall          WHERE date=? ORDER BY modality", (today,)).fetchall()
+    overtime_today  = conn.execute("SELECT * FROM overtime        WHERE date=? ORDER BY staff_name", (today,)).fetchall()
+    equipment_today = conn.execute("SELECT * FROM equipment_log   WHERE date=? ORDER BY equipment", (today,)).fetchall()
+    handover_today  = conn.execute("SELECT * FROM handover        WHERE date=? ORDER BY shift, id", (today,)).fetchall()
+    issues_today    = conn.execute("SELECT * FROM issues          WHERE date=? ORDER BY severity, id", (today,)).fetchall()
+    issues_open_rows  = conn.execute("SELECT * FROM issues WHERE status='진행중' ORDER BY severity, date DESC LIMIT 10").fetchall()
+    equip_active_rows = conn.execute("SELECT * FROM equipment_log WHERE status='처리중' ORDER BY date DESC LIMIT 10").fetchall()
+
+
+▶ templates/write.html 주요 변경
+
+[저장 버튼 + 숨김 제출 폼 + JS confirm]
+    <form id="submitForm" method="post" action="{{ url_for('worklog_submit', date_str=sel) }}" style="display:none"></form>
+    <button type="button" onclick="handleSave()" class="btn btn-primary">💾 저장</button>
+
+    function handleSave() {
+      if (confirm('업무일지가 저장되었습니다.\n제출하시겠습니까?')) {
+        document.getElementById('submitForm').submit();
+      }
+    }
+
+[상태 배지 - 제출됨/반려됨 표시]
+    {% if wl_status == '제출' %}
+    <span class="badge badge-submitted">✅ 제출됨</span>
+    {% elif wl_status == '반려' %}
+    <span class="badge badge-rejected">❌ 반려됨</span>
+    {% endif %}
+
+
+▶ templates/worklog_list.html 주요 변경
+
+[관리자 반려 모달]
+    <div id="rejectModal">
+      <div class="modal-box">
+        <form id="rejectForm" method="post">
+          <select name="target_user">
+            {% for u in users %}
+            <option value="{{ u.username }}">{{ u.name }} ({{ u.username }})</option>
+            {% endfor %}
+          </select>
+        </form>
+      </div>
+    </div>
+
+    function openRejectModal(dateStr) {
+      document.getElementById('rejectForm').action = '/worklog/reject/' + dateStr;
+      document.getElementById('rejectModal').style.display = 'flex';
+    }
+
+
+▶ templates/dashboard.html 주요 변경
+
+[KPI 툴팁 CSS]
+    .stat-card { position:relative; overflow:visible !important; }
+    .kpi-tooltip { display:none; position:absolute; ... }
+    .stat-card:hover .kpi-tooltip { display:block; }
+
+[레이아웃 구성]
+    KPI 6개 → 2열(근무자|휴가) → 2열(On-call|연장근무) → 전체(장비이력) → 2열(인수인계|이슈)
+
+[근무조 배지 색상]
+    .shift-오전 { background:#e3f2fd; color:#1565c0; }
+    .shift-종일 { background:#e8f5e9; color:#2e7d32; }
+    .shift-야간 { background:#fce4ec; color:#c62828; }
+
+
+▶ templates/base.html 변경
+
+    ✏️ 작성  →  ✏️ 업무일지 작성
+
+
+▶ README.md / CLAUDE.md
+
+[추가된 개발 이력 섹션]
+    - 저장/제출 워크플로우 개선
+    - 업무일지 제출·반려 시스템 개편
+    - 대시보드 전면 개편
+
+[메뉴 변경]
+    "작성" → "업무일지 작성"
+
+[권한 체계 업데이트]
+    저장(데이터 저장만)과 제출(리스트 등록) 구분 명시
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+■ 오류 및 해결
+
+1. timedelta 미사용 import 경고
+   - vacation_week 제거 후 timedelta 불필요
+   - 수정: from datetime import datetime, date, timedelta
+         → from datetime import datetime, date
+
+2. Flask 앱 python 명령어 실행 문제
+   - python 명령이 Python 런처 창을 여는 문제
+   - 해결: PowerShell에서 py app.py 또는 Start-Process 사용
+
+3. worklog_reject GET → POST 변경
+   - target_user 폼 데이터 수신 위해 POST 방식으로 전환
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+■ 사용자 전체 발화 목록
+
+1. "readiology_worklog 폴더내의 파일을 https://github.com/caumcpacs-ai/radiology-worklog.git에 전부 업로드해"
+
+2. "radiology_worklog폴더의 하위폴더 및 파일을 https://github.com/caumcpacs-ai/Radiology-worklog.git에 업로드 해"
+
+3. "업무일지를 작성할때 저장완료를 저장, 제출 버튼으로 구분하고 저장은 단순 저장하고 제출된 일자만 업무일지 리스트에 쌓이게 하며, 관리자가 반려를 할때 사용자를 선택할 수 있게 해서 업무일리 리스트에는 선택된 사용자의 리스트에 보이게 수정해"
+
+4. "작성에서 저장을 하면 화면은 그대로 있고 '업무일지가 저장되었습니다. 제출하시겠습니까?'라는 팝업을 띄우고 '예'라고 하면 제출해서 리스트에 나오게 하고 '아니오'라고 하면 그냥 저장된 상태 그대로 놔두게 수정해"
+
+5. "메인 대시보드에서 위의 KPI지표에 제목에 커서가 위치하면 카운트 된 내용을 보여줘 / 그리고 그 아래에는 근무자현황, 휴가현황도 전부 보여지게 해"
+
+6. "이번주 휴가를 오늘 휴가로 변경해 / 그리고 대시보드에 장비이력도 추가해 / 작성에 모든 항목이 대시보드에 나와야 해 / 그리고 작성을 업무일지 작성으로 바꿔"
+
+7. "지금 수정된 내용을 readme.md에 추가하고 모든 내용을 claude.md파일을 만들어서 거기에도 추가해 / 앞으로 readme.md파일에 추가할때 claude.md파일에도 동일하게 추가해"
+
+8. "지금까지 내가 내용을 전부 대화내용.txt 파일로 저장해 /compact 포함해서"
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+■ 메모리 기록
+
+- 피드백 규칙 저장: README.md 수정 시 CLAUDE.md도 항상 동일하게 업데이트
+  (파일: memory/feedback_readme_claude_sync.md)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+■ 최종 상태
+
+- 모든 작업 완료 및 GitHub push 완료
+- 마지막 커밋: e0943ef
+- GitHub 저장소: https://github.com/caumcpacs-ai/Radiology-worklog
+- 앱 접속: http://localhost:1000
+
+
+================================================================================

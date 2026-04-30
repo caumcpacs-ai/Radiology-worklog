@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>영상의학과 업무일지</title>
+<style>
+/* ── 공통 (base.html 동일) ── */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'맑은 고딕','Malgun Gothic',sans-serif;background:#f0f2f5;color:#333;font-size:14px}
+a{text-decoration:none;color:inherit}
+table{width:100%;border-collapse:collapse}
+th,td{padding:8px 12px;border-bottom:1px solid #e0e0e0;text-align:left;vertical-align:middle}
+th{background:#f8f9fa;font-weight:600;color:#555}
+tr:hover{background:#fafbfc}
+input,select,textarea{width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:4px;font-size:14px;font-family:inherit}
+textarea{resize:vertical;min-height:80px}
+button,.btn{padding:7px 16px;border:none;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit;font-weight:500}
+.btn-primary{background:#1a73e8;color:#fff}.btn-primary:hover{background:#1558b0}
+.btn-success{background:#34a853;color:#fff}
+.btn-danger{background:#ea4335;color:#fff}
+.btn-warning{background:#fbbc04;color:#333}
+.btn-secondary{background:#6c757d;color:#fff}
+.btn-sm{padding:4px 10px;font-size:12px}
+label{display:block;margin-bottom:4px;font-weight:500;color:#555}
+.form-group{margin-bottom:14px}
+.card{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.1);padding:20px;margin-bottom:16px}
+.card-title{font-size:15px;font-weight:700;margin-bottom:14px;color:#1a73e8;border-bottom:2px solid #1a73e8;padding-bottom:6px}
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}
+.badge-danger{background:#fdecea;color:#c62828}
+.badge-warning{background:#fff8e1;color:#f57f17}
+.badge-success{background:#e8f5e9;color:#2e7d32}
+.badge-info{background:#e3f2fd;color:#1565c0}
+.badge-secondary{background:#f5f5f5;color:#555}
+.alert{padding:10px 16px;border-radius:4px;margin-bottom:12px;font-size:13px}
+.alert-success{background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9}
+.alert-danger{background:#fdecea;color:#c62828;border:1px solid #ffcdd2}
+.alert-info{background:#e3f2fd;color:#1565c0;border:1px solid #bbdefb}
+.text-muted{color:#888;font-size:12px}
+.text-right{text-align:right}
+.mt-2{margin-top:8px}.mb-2{margin-bottom:8px}
+.flex{display:flex}.flex-wrap{flex-wrap:wrap}.align-center{align-items:center}.justify-between{justify-content:space-between}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+/* ── 사이드바 ── */
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:200px;background:#1e2a3a;color:#fff;padding:0;overflow-y:auto;z-index:100;display:flex;flex-direction:column}
+.sidebar-header{padding:18px 16px;background:#152232;font-size:13px;font-weight:700;border-bottom:1px solid #2a3f55}
+.sidebar-header .dept{color:#8ab4f8;font-size:11px;margin-top:2px}
+.sidebar nav a{display:block;padding:10px 16px;color:#b0bec5;font-size:13px;border-left:3px solid transparent;transition:.2s}
+.sidebar nav a:hover,.sidebar nav a.active{background:#2a3f55;color:#fff;border-left-color:#1a73e8}
+.sidebar nav .nav-section{padding:8px 16px 4px;font-size:10px;color:#546e7a;text-transform:uppercase;letter-spacing:.8px;margin-top:4px}
+.sidebar-footer{padding:12px 16px;border-top:1px solid #2a3f55;font-size:12px;color:#78909c}
+/* ── 메인 ── */
+.main{margin-left:200px;min-height:100vh}
+.topbar{background:#fff;padding:12px 24px;border-bottom:1px solid #e0e0e0;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:50}
+.topbar .page-title{font-size:16px;font-weight:700;color:#1e2a3a}
+.content{padding:20px 24px 60px}
+/* ── KPI 카드 ── */
+.stat-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:20px}
+.stat-card{background:#fff;border-radius:8px;padding:16px 20px;box-shadow:0 1px 4px rgba(0,0,0,.1);border-left:4px solid #1a73e8;display:flex;flex-direction:column;position:relative;overflow:visible}
+.stat-card .num{font-size:28px;font-weight:700;color:#1a73e8}
+.stat-card .lbl{font-size:12px;color:#888;margin-top:2px;cursor:default}
+.stat-card.red{border-left-color:#ea4335}.stat-card.red .num{color:#ea4335}
+.stat-card.green{border-left-color:#34a853}.stat-card.green .num{color:#34a853}
+.stat-card.yellow{border-left-color:#fbbc04}.stat-card.yellow .num{color:#f57f17}
+.stat-card.purple{border-left-color:#9c27b0}.stat-card.purple .num{color:#9c27b0}
+.stat-card.teal{border-left-color:#009688}.stat-card.teal .num{color:#009688}
+/* KPI 툴팁 */
+.kpi-tooltip{display:none;position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.15);padding:12px 14px;z-index:200;min-width:260px;max-width:400px;font-size:12px;text-align:left;pointer-events:none;white-space:normal}
+.kpi-tooltip::before{content:'';position:absolute;top:-6px;left:50%;transform:translateX(-50%);border:6px solid transparent;border-bottom-color:#ddd;border-top:none}
+.kpi-tooltip::after{content:'';position:absolute;top:-5px;left:50%;transform:translateX(-50%);border:6px solid transparent;border-bottom-color:#fff;border-top:none}
+.stat-card:hover .kpi-tooltip{display:block}
+.kpi-tooltip .tt-title{font-weight:700;color:#1e2a3a;margin-bottom:8px;font-size:12px;border-bottom:1px solid #eee;padding-bottom:5px}
+.kpi-tooltip table{width:100%;border-collapse:collapse}
+.kpi-tooltip td{padding:3px 5px;vertical-align:top;border-bottom:1px solid #f5f5f5}
+.kpi-tooltip tr:last-child td{border-bottom:none}
+.kpi-tooltip .empty-msg{color:#aaa;font-style:italic}
+/* ── 대시보드 ── */
+.shift-badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:600}
+.shift-오전{background:#e3f2fd;color:#1565c0}
+.shift-종일{background:#e8f5e9;color:#2e7d32}
+.shift-야간{background:#fce4ec;color:#c62828}
+.dash-2col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+/* ── 테이블 래퍼 ── */
+.table-wrap{overflow-x:auto;background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+.table-wrap table{margin:0}
+.table-header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid #e0e0e0}
+.table-header h2{font-size:15px;font-weight:700}
+/* ── 업무일지 리스트 ── */
+.log-table th,.log-table td{text-align:center}
+.log-table td:first-child{text-align:left;font-weight:600}
+.log-table td:last-child{text-align:center;white-space:nowrap}
+.dot{display:inline-block;width:22px;height:22px;border-radius:50%;font-size:11px;line-height:22px;font-weight:700}
+.dot.filled{background:#1a73e8;color:#fff}
+.dot.empty{background:#eee;color:#aaa}
+.badge-submitted{background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:600}
+.badge-rejected{background:#fdecea;color:#c62828;border:1px solid #ffcdd2;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:600}
+/* ── 작성 페이지 ── */
+.date-bar{display:flex;align-items:center;gap:12px;margin-bottom:20px;background:#fff;padding:14px 18px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+.date-bar input[type=date]{width:180px;font-size:15px;font-weight:600;border:2px solid #1a73e8;border-radius:6px;padding:6px 10px;color:#1e2a3a}
+.acc{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.1);margin-bottom:10px;overflow:hidden}
+.acc-head{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;cursor:pointer;user-select:none;border-left:4px solid #1a73e8;font-weight:700;font-size:14px;background:#fff}
+.acc-head:hover{background:#f5f8ff}
+.acc-head .cnt{font-size:12px;color:#888;font-weight:400;margin-left:6px}
+.acc-head .toggle{font-size:18px;color:#aaa;transition:.2s}
+.acc-body{display:block;padding:0 18px 16px;border-top:1px solid #f0f0f0}
+.add-form{background:#f8f9fb;border-radius:6px;padding:14px;margin-top:10px;border:1px dashed #ccc}
+.add-form .form-row{display:grid;gap:8px;margin-bottom:8px}
+.add-form .form-row.col2{grid-template-columns:1fr 1fr}
+.add-form .form-row.col3{grid-template-columns:1fr 1fr 1fr}
+.add-form .form-row.col4{grid-template-columns:1fr 1fr 1fr 1fr}
+.add-form label{font-size:12px;margin-bottom:2px;color:#555}
+.edit-form{background:#fffde7;border-radius:6px;padding:14px;margin-bottom:4px;border:1px solid #f9a825;display:none}
+.edit-form .form-row{display:grid;gap:8px;margin-bottom:8px}
+.edit-form .form-row.col2{grid-template-columns:1fr 1fr}
+.edit-form .form-row.col3{grid-template-columns:1fr 1fr 1fr}
+.edit-form .form-row.col4{grid-template-columns:1fr 1fr 1fr 1fr}
+.edit-form label{font-size:12px;margin-bottom:2px;color:#555}
+.entry-list{margin-top:10px}
+.entry-row{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-radius:4px;background:#fafafa;border:1px solid #eee;margin-bottom:4px;font-size:13px;gap:8px}
+.entry-row .info{flex:1;min-width:0}
+.entry-row .btns{display:flex;gap:4px;flex-shrink:0}
+.acc-head.roster-h{border-left-color:#5c6bc0}
+.acc-head.vacation-h{border-left-color:#26a69a}
+.acc-head.oncall-h{border-left-color:#1a73e8}
+.acc-head.overtime-h{border-left-color:#f57c00}
+.acc-head.equip-h{border-left-color:#e53935}
+.acc-head.handover-h{border-left-color:#43a047}
+.acc-head.issue-h{border-left-color:#8e24aa}
+/* ── 반려 모달 ── */
+#rejectModal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9999;justify-content:center;align-items:center}
+.modal-box{background:#fff;border-radius:10px;padding:28px;min-width:340px;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+.modal-box h3{margin-bottom:8px;font-size:16px;color:#1e2a3a}
+.modal-box .modal-date{color:#555;font-size:13px;margin-bottom:18px}
+.modal-box label{font-size:13px;font-weight:600;display:block;margin-bottom:6px}
+.modal-box select{width:100%;padding:9px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+/* ── 인쇄 ── */
+.print-wrap{max-width:900px;margin:0 auto;padding:20px}
+.print-header-tbl{width:100%;border-collapse:collapse;border-bottom:2px solid #000;margin-bottom:16px}
+.print-header-tbl td{border:none;padding:0 0 12px 0;vertical-align:middle}
+.print-header-title h1{font-size:22px;font-weight:700;letter-spacing:1px}
+.print-header-title .sub{font-size:12px;color:#444;margin-top:6px}
+.approval-box{border-collapse:collapse;font-size:11px;float:right;width:192px;table-layout:fixed}
+.approval-box th,.approval-box td{border:1px solid #000;text-align:center;padding:0;width:64px}
+.approval-box th{font-weight:600;height:24px;padding:2px 4px;background:#fff}
+.approval-box td{height:50px}
+.psection{margin-bottom:16px}
+.psection-title{font-size:13px;font-weight:700;background:#1e2a3a;color:#fff;padding:5px 10px;border-radius:3px;margin-bottom:6px}
+.psection table{width:100%;border-collapse:collapse;font-size:11px}
+.psection th,.psection td{border:1px solid #ccc;padding:5px 8px;text-align:left;vertical-align:middle}
+.psection th{background:#f0f0f0;font-weight:600;white-space:nowrap}
+.empty-msg{color:#aaa;font-style:italic;padding:6px 0;font-size:11px}
+.print-footer{margin-top:20px;border-top:1px solid #ccc;padding-top:8px;font-size:11px;color:#666;display:flex;justify-content:space-between}
+@media print{
+  .sidebar,.topbar,.no-print{display:none!important}
+  .main{margin-left:0}
+  @page{margin:15mm;size:A4}
+}
+/* ── 로그인 ── */
+#login-page{display:none;align-items:center;justify-content:center;min-height:100vh;background:#1e2a3a}
+.login-box{background:#fff;border-radius:12px;padding:40px;width:360px;box-shadow:0 8px 32px rgba(0,0,0,.3)}
+.login-box .logo{text-align:center;margin-bottom:28px}
+.login-box .logo .icon{font-size:40px;display:block;margin-bottom:8px}
+.login-box .logo h1{font-size:18px;font-weight:700;color:#1e2a3a}
+.login-box .logo p{font-size:12px;color:#888;margin-top:4px}
+.login-box input{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;font-family:inherit;margin-bottom:14px}
+.login-box input:focus{outline:none;border-color:#1a73e8}
+.login-box button{width:100%;padding:11px;background:#1a73e8;color:#fff;border:none;border-radius:6px;font-size:15px;font-weight:600;cursor:pointer}
+.login-box button:hover{background:#1558b0}
+.hint{text-align:center;margin-top:14px;font-size:11px;color:#aaa}
+/* ── 사용자 관리 ── */
+.form-container{max-width:700px;background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.1);padding:24px}
+.form-title{font-size:16px;font-weight:700;margin-bottom:20px;padding-bottom:10px;border-bottom:2px solid #1a73e8;color:#1e2a3a}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ 로그인 ═══════════ -->
+<div id="login-page" style="display:flex">
+  <div class="login-box">
+    <div class="logo">
+      <span class="icon">🏥</span>
+      <h1>영상의학과 업무일지</h1>
+      <p>Radiology Department Work Log</p>
+    </div>
+    <div id="login-alert" class="alert alert-danger" style="display:none"></div>
+    <label>아이디</label>
+    <input type="text" id="inp-user" placeholder="아이디 입력" autocomplete="username">
+    <label>비밀번호</label>
+    <input type="password" id="inp-pw" placeholder="비밀번호 입력" autocomplete="current-password">
+    <button onclick="doLogin()">로그인</button>
+    <p class="hint">초기 계정: admin / admin1234</p>
+  </div>
+</div>
+
+<!-- ═══════════ 앱 ═══════════ -->
+<div id="app-page" style="display:none">
+  <div class="sidebar">
+    <div class="sidebar-header">🏥 영상의학과 업무일지<div class="dept">Radiology Dept.</div></div>
+    <nav style="flex:1">
+      <a href="#" data-page="dashboard">📊 메인</a>
+      <a href="#" data-page="write">✏️ 업무일지 작성</a>
+      <a href="#" data-page="worklog">📋 업무일지 리스트</a>
+      <div class="nav-section admin-only" style="display:none">관리</div>
+      <a href="#" data-page="users" class="admin-only" style="display:none">👥 사용자 관리</a>
+    </nav>
+    <div class="sidebar-footer">
+      👤 <span id="sf-name"></span> (<span id="sf-role"></span>)<br>
+      <a href="#" onclick="doLogout();return false" style="color:#ef9a9a">로그아웃</a>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="page-title" id="page-title"></div>
+      <div class="text-muted" id="topbar-clock"></div>
+    </div>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+
+<!-- ═══════════ 반려 모달 ═══════════ -->
+<div id="rejectModal">
+  <div class="modal-box">
+    <h3>업무일지 반려</h3>
+    <p class="modal-date" id="rejectModalDate"></p>
+    <label>반려 대상 사용자 선택</label>
+    <select id="rejectUserSelect"></select>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeRejectModal()">취소</button>
+      <button class="btn btn-warning" onclick="confirmReject()">반려 확인</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── 전역 상태 ──
+let ME = null; // {user, name, role}
+let _rejectDate = '';
+let _writeDate = '';
+
+// ── API 헬퍼 ──
+async function api(path, body=null) {
+  try {
+    const opts = {credentials:'include'};
+    if (body !== null) {
+      opts.method = 'POST';
+      opts.headers = {'Content-Type':'application/json'};
+      opts.body = JSON.stringify(body);
+    }
+    const r = await fetch(path, opts);
+    return r.json();
+  } catch(e) {
+    return {ok: false, msg: '서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하고\nhttp://서버IP:1000/app 으로 접속하세요.\n(' + e.message + ')'};
+  }
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── 시계 ──
+setInterval(() => {
+  const el = document.getElementById('topbar-clock');
+  if (el) el.textContent = new Date().toLocaleString('ko-KR');
+}, 1000);
+
+// ── 로그인 / 로그아웃 ──
+async function doLogin() {
+  const username = document.getElementById('inp-user').value.trim();
+  const password = document.getElementById('inp-pw').value;
+  const r = await api('/api/login', {username, password});
+  if (r.ok) {
+    ME = r;
+    document.getElementById('login-page').style.display = 'none';
+    document.getElementById('app-page').style.display = '';
+    document.getElementById('sf-name').textContent = r.name;
+    document.getElementById('sf-role').textContent = r.role === 'admin' ? '관리자' : '사용자';
+    document.querySelectorAll('.admin-only').forEach(el => el.style.display = r.role === 'admin' ? '' : 'none');
+    nav('dashboard');
+  } else {
+    const el = document.getElementById('login-alert');
+    el.textContent = r.msg || '로그인 실패';
+    el.style.display = '';
+  }
+}
+
+async function doLogout() {
+  await api('/api/logout', {});
+  ME = null;
+  document.getElementById('app-page').style.display = 'none';
+  document.getElementById('login-page').style.display = 'flex';
+  document.getElementById('inp-pw').value = '';
+  document.getElementById('login-alert').style.display = 'none';
+}
+
+// ── 네비게이션 ──
+const pageTitles = {dashboard:'📊 대시보드', write:'✏️ 작성', worklog:'📋 업무일지 리스트', users:'👥 사용자 관리', print:'🖨️ 인쇄'};
+
+function nav(page, params={}) {
+  document.querySelectorAll('.sidebar nav a').forEach(a => a.classList.toggle('active', a.dataset.page === page));
+  document.getElementById('page-title').textContent = pageTitles[page] || page;
+  document.getElementById('content').innerHTML = '<p style="padding:20px;color:#888">로딩 중...</p>';
+  if (page === 'dashboard') renderDashboard();
+  else if (page === 'write') renderWrite(params.date);
+  else if (page === 'worklog') renderWorklog();
+  else if (page === 'users') renderUsers();
+  else if (page === 'print') renderPrint(params.date);
+}
+
+document.querySelectorAll('[data-page]').forEach(a => {
+  a.addEventListener('click', e => { e.preventDefault(); nav(a.dataset.page); });
+});
+
+// ── 공통: 아코디언 토글 ──
+function toggle(head) {
+  const body = head.nextElementSibling;
+  const arrow = head.querySelector('.toggle');
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  arrow.textContent = isOpen ? '▼' : '▲';
+}
+
+// ═══════════════════════════════════════════════════
+// 대시보드
+// ═══════════════════════════════════════════════════
+async function renderDashboard() {
+  const d = await api('/api/dashboard');
+  if (!d.ok) return;
+
+  function badge(text, cls) { return `<span class="badge ${cls}">${esc(text)}</span>`; }
+  function sev(s) { return s==='긴급'?'badge-danger':s==='중요'?'badge-warning':'badge-secondary'; }
+
+  function kpiTooltip(title, rows, colFn) {
+    const rowsHtml = rows.length
+      ? rows.map(r=>`<tr>${colFn(r)}</tr>`).join('')
+      : '<tr><td colspan="3" class="empty-msg">없음</td></tr>';
+    return `<div class="kpi-tooltip"><div class="tt-title">${title} (${rows.length}건)</div><table>${rowsHtml}</table></div>`;
+  }
+
+  const kpis = [
+    { cls:'red',    num:d.issues_open.length,    lbl:'⚠️ 미해결 이슈',
+      tip: kpiTooltip('⚠️ 미해결 이슈', d.issues_open, r=>`<td>${badge(r.severity,sev(r.severity))}</td><td style="font-weight:600">${esc(r.title)}</td><td style="color:#888">${esc(r.date)}</td>`) },
+    { cls:'',       num:d.issues_today.length,   lbl:'📋 오늘 이슈',   style:'border-left-color:#1a73e8',
+      tip: kpiTooltip('📋 오늘 이슈', d.issues_today, r=>`<td>${badge(r.severity,sev(r.severity))}</td><td style="font-weight:600">${esc(r.title)}</td><td style="color:#888">${esc(r.category)}</td>`) },
+    { cls:'green',  num:d.handover_today.length, lbl:'🔄 오늘 인수인계',
+      tip: kpiTooltip('🔄 오늘 인수인계', d.handover_today, r=>`<td>${badge(r.priority,sev(r.priority))}</td><td>${esc(r.from_person)}→${esc(r.to_person)}</td><td style="color:#555">${esc((r.content||'').slice(0,25))}</td>`) },
+    { cls:'yellow', num:d.equip_active.length,   lbl:'🔧 장비 처리중',
+      tip: kpiTooltip('🔧 처리중인 장비', d.equip_active, r=>`<td style="font-weight:600">${esc(r.equipment)}</td><td>${badge(r.log_type,'badge-warning')}</td><td style="color:#555">${esc((r.description||'').slice(0,25))}</td>`) },
+    { cls:'purple', num:d.vacation_today.length, lbl:'🌴 오늘 휴가',
+      tip: kpiTooltip('🌴 오늘 휴가', d.vacation_today, r=>`<td style="font-weight:600">${esc(r.staff_name)}</td><td>${badge(r.vacation_type,'badge-info')}</td><td style="color:#888">${esc(r.start_date)}</td>`) },
+    { cls:'teal',   num:d.oncall_today.length,   lbl:'📱 오늘 On-call',
+      tip: kpiTooltip('📱 오늘 On-call', d.oncall_today, r=>`<td>${badge(r.modality,'badge-info')}</td><td style="font-weight:600">${esc(r.staff_name)}</td><td style="color:#888">${r.start_time?esc(r.start_time)+'~'+esc(r.end_time):'-'}</td>`) },
+  ];
+
+  const kpiHtml = kpis.map(k=>`
+    <div class="stat-card ${k.cls}" ${k.style?`style="${k.style}"`:''}">
+      <div class="num" ${k.style?`style="color:#1a73e8"`:''}>${k.num}</div>
+      <div class="lbl">${k.lbl}</div>
+      ${k.tip}
+    </div>`).join('');
+
+  const td = d.today;
+
+  function dashCard(title, content) {
+    return `<div class="card"><div class="card-title">${title}</div>${content}<div class="mt-2"><a href="#" onclick="nav('write',{date:'${td}'});return false" class="btn btn-sm btn-primary">+ 등록</a></div></div>`;
+  }
+  function emptyMsg(msg) { return `<p class="text-muted" style="padding:10px 0">${msg}</p>`; }
+
+  // 근무자
+  const rosterHtml = d.roster_today.length ? `<table><thead><tr><th>근무조</th><th>성명</th><th>직종</th><th>비고</th></tr></thead><tbody>${
+    d.roster_today.map(r=>`<tr><td><span class="shift-badge shift-${esc(r.shift)}">${esc(r.shift)}</span></td><td><strong>${esc(r.staff_name)}</strong></td><td>${esc(r.role||'-')}</td><td>${esc(r.note||'-')}</td></tr>`).join('')
+  }</tbody></table>` : emptyMsg('등록된 근무자가 없습니다.');
+
+  // 휴가
+  const vacHtml = d.vacation_today.length ? `<table><thead><tr><th>성명</th><th>구분</th><th>날짜</th></tr></thead><tbody>${
+    d.vacation_today.map(r=>`<tr><td><strong>${esc(r.staff_name)}</strong></td><td><span class="badge badge-info">${esc(r.vacation_type)}</span></td><td>${esc(r.start_date)}</td></tr>`).join('')
+  }</tbody></table>` : emptyMsg('오늘 휴가자가 없습니다.');
+
+  // On-call
+  const oncallHtml = d.oncall_today.length ? `<table><thead><tr><th>모달리티</th><th>담당자</th><th>시간</th><th>내용</th></tr></thead><tbody>${
+    d.oncall_today.map(r=>`<tr><td><span class="badge badge-info">${esc(r.modality)}</span></td><td><strong>${esc(r.staff_name)}</strong></td><td>${r.start_time?esc(r.start_time)+'~'+esc(r.end_time):'-'}</td><td>${esc(r.note||'-')}</td></tr>`).join('')
+  }</tbody></table>` : emptyMsg('등록된 On-call이 없습니다.');
+
+  // 연장근무
+  const otHtml = d.overtime_today.length ? `<table><thead><tr><th>성명</th><th>시작</th><th>종료</th><th>시간</th><th>사유</th></tr></thead><tbody>${
+    d.overtime_today.map(r=>`<tr><td><strong>${esc(r.staff_name)}</strong></td><td>${esc(r.start_time)}</td><td>${esc(r.end_time)}</td><td>${r.hours}h</td><td>${esc(r.reason)}</td></tr>`).join('')
+  }</tbody></table>` : emptyMsg('등록된 연장근무가 없습니다.');
+
+  // 장비
+  const eqHtml = d.equipment_today.length ? `<table><thead><tr><th>장비</th><th>유형</th><th>내용</th><th>엔지니어</th><th>다운타임</th><th>상태</th></tr></thead><tbody>${
+    d.equipment_today.map(r=>`<tr><td><strong>${esc(r.equipment)}</strong></td><td><span class="badge badge-warning">${esc(r.log_type)}</span></td><td>${esc(r.description)}</td><td>${esc(r.engineer||'-')}</td><td>${r.downtime_hours}h</td><td><span class="badge ${r.status==='완료'?'badge-success':'badge-danger'}">${esc(r.status)}</span></td></tr>`).join('')
+  }</tbody></table>` : emptyMsg('등록된 장비 이력이 없습니다.');
+
+  // 인수인계
+  const hvHtml = d.handover_today.length ? d.handover_today.map(r=>`
+    <div style="border-left:3px solid ${r.priority==='긴급'?'#ea4335':r.priority==='중요'?'#fbbc04':'#ccc'};padding:8px 12px;margin-bottom:8px;background:#fafafa;border-radius:0 4px 4px 0">
+      <div style="font-size:12px;color:#888">${esc(r.shift)} | ${esc(r.from_person)} → ${esc(r.to_person)}
+        <span class="badge ${r.priority==='긴급'?'badge-danger':r.priority==='중요'?'badge-warning':'badge-secondary'}">${esc(r.priority)}</span>
+      </div>
+      <div style="margin-top:4px;font-size:13px">${esc((r.content||'').slice(0,80))}${(r.content||'').length>80?'…':''}</div>
+    </div>`).join('') : emptyMsg('등록된 인수인계가 없습니다.');
+
+  // 이슈
+  const issHtml = d.issues_today.length ? `<table><thead><tr><th>구분</th><th>심각도</th><th>제목</th><th>상태</th></tr></thead><tbody>${
+    d.issues_today.map(r=>`<tr><td>${esc(r.category)}</td><td><span class="badge ${r.severity==='긴급'?'badge-danger':r.severity==='중요'?'badge-warning':'badge-secondary'}">${esc(r.severity)}</span></td><td><strong>${esc(r.title)}</strong></td><td><span class="badge ${r.status==='진행중'?'badge-danger':r.status==='해결'?'badge-success':'badge-secondary'}">${esc(r.status)}</span></td></tr>`).join('')
+  }</tbody></table>` : emptyMsg('등록된 이슈가 없습니다.');
+
+  document.getElementById('content').innerHTML = `
+    <div class="stat-grid">${kpiHtml}</div>
+    <div class="dash-2col">
+      ${dashCard(`👥 근무자 현황 (${td})`, rosterHtml)}
+      ${dashCard(`🌴 휴가 현황 (${td})`, vacHtml)}
+    </div>
+    <div class="dash-2col">
+      ${dashCard(`📱 On-call (${td})`, oncallHtml)}
+      ${dashCard(`⏰ 연장근무 (${td})`, otHtml)}
+    </div>
+    ${dashCard(`🔧 장비 이력 (${td})`, eqHtml)}
+    <div class="dash-2col">
+      ${dashCard(`🔄 인수인계 (${td})`, hvHtml)}
+      ${dashCard(`⚠️ 특이사항·이슈 (${td})`, issHtml)}
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════
+// 업무일지 작성
+// ═══════════════════════════════════════════════════
+async function renderWrite(date) {
+  const today = new Date().toISOString().slice(0,10);
+  _writeDate = date || today;
+  const d = await api('/api/write?date=' + _writeDate);
+  if (!d.ok) return;
+
+  const ws = d.wl_status;
+  const wlStatus = ws?.status || null;
+  const isAdmin = ME?.role === 'admin';
+  const isRejectedToMe = ws?.status === '반려' && ws?.rejected_to === ME?.user;
+  const canEdit = isAdmin || !wlStatus || isRejectedToMe;
+
+  // 상태 배지
+  let statusBadge = '';
+  if (wlStatus === '제출') {
+    statusBadge = `<span style="background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600">✅ 제출됨</span>`;
+  } else if (wlStatus === '반려') {
+    statusBadge = `<span style="background:#fdecea;color:#c62828;border:1px solid #ffcdd2;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600">⚠️ 반려됨 — 수정 후 다시 저장하세요</span>`;
+  }
+
+  function accSection(id, headCls, icon, title, rows, bodyHtml) {
+    return `<div class="acc">
+      <div class="acc-head ${headCls}" onclick="toggle(this)">
+        ${icon} ${title} <span class="cnt">(${rows.length}건)</span>
+        <span class="toggle">▲</span>
+      </div>
+      <div class="acc-body">${bodyHtml}</div>
+    </div>`;
+  }
+
+  // ① 근무자
+  const rosterRows = d.roster.map(r=>`
+    <div class="entry-row" id="row-r${r.id}">
+      <div class="info"><span class="badge badge-info">${esc(r.shift)}</span> <strong>${esc(r.staff_name)}</strong> ${esc(r.role||'')} ${esc(r.note||'')}</div>
+      ${canEdit?`<div class="btns">
+        <button class="btn btn-sm btn-primary" onclick="editRow('r${r.id}')">수정</button>
+        <button class="btn btn-sm btn-danger" onclick="delItem('/api/write/roster/delete/${r.id}')">삭제</button>
+      </div>`:''}
+    </div>
+    <div class="edit-form" id="edit-r${r.id}">
+      <div class="form-row col3">
+        <div><label>근무조</label><select name="shift">${['오전','종일','야간'].map(v=>`<option${v===r.shift?' selected':''}>${v}</option>`).join('')}</select></div>
+        <div><label>성명</label><input name="staff_name" value="${esc(r.staff_name)}" required></div>
+        <div><label>직종</label><input name="role" value="${esc(r.role||'')}"></div>
+      </div>
+      <div class="form-row"><div><label>비고</label><input name="note" value="${esc(r.note||'')}"></div></div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-primary" onclick="saveEdit('/api/write/roster/edit/${r.id}','r${r.id}',['shift','staff_name','role','note'])">저장</button>
+        <button class="btn btn-sm btn-secondary" onclick="cancelEdit('r${r.id}')">취소</button>
+      </div>
+    </div>`).join('');
+
+  const rosterAdd = canEdit ? `<div class="add-form">
+    <div class="form-row col3">
+      <div><label>근무조</label><select name="shift"><option>오전</option><option>종일</option><option>야간</option></select></div>
+      <div><label>성명</label><input name="staff_name" placeholder="홍길동" required></div>
+      <div><label>직종</label><input name="role" placeholder="방사선사"></div>
+    </div>
+    <div class="form-row"><div><label>비고</label><input name="note" placeholder="특이사항"></div></div>
+    <button class="btn btn-primary btn-sm" onclick="addItem('/api/write/roster/add',this,['shift','staff_name','role','note'],{date:'${_writeDate}'})">+ 추가</button>
+  </div>` : '';
+
+  // ② 휴가
+  const vacRows = d.vacation.map(r=>`
+    <div class="entry-row" id="row-v${r.id}">
+      <div class="info"><strong>${esc(r.staff_name)}</strong> <span class="badge badge-info">${esc(r.vacation_type)}</span> ${esc(r.start_date)}</div>
+      ${canEdit?`<div class="btns">
+        <button class="btn btn-sm btn-primary" onclick="editRow('v${r.id}')">수정</button>
+        <button class="btn btn-sm btn-danger" onclick="delItem('/api/write/vacation/delete/${r.id}')">삭제</button>
+      </div>`:''}
+    </div>
+    <div class="edit-form" id="edit-v${r.id}">
+      <div class="form-row col3">
+        <div><label>성명</label><input name="staff_name" value="${esc(r.staff_name)}" required></div>
+        <div><label>구분</label><select name="vacation_type">${['연차','반차','병가','공가','기타'].map(v=>`<option${v===r.vacation_type?' selected':''}>${v}</option>`).join('')}</select></div>
+        <div><label>날짜</label><input type="date" name="start_date" value="${esc(r.start_date)}" required></div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-primary" onclick="saveEdit('/api/write/vacation/edit/${r.id}','v${r.id}',['staff_name','vacation_type','start_date'])">저장</button>
+        <button class="btn btn-sm btn-secondary" onclick="cancelEdit('v${r.id}')">취소</button>
+      </div>
+    </div>`).join('');
+
+  const vacAdd = canEdit ? `<div class="add-form">
+    <div class="form-row col3">
+      <div><label>성명</label><input name="staff_name" placeholder="홍길동" required></div>
+      <div><label>구분</label><select name="vacation_type"><option>연차</option><option>반차</option><option>병가</option><option>공가</option><option>기타</option></select></div>
+      <div><label>날짜</label><input type="date" name="start_date" value="${_writeDate}" required></div>
+    </div>
+    <button class="btn btn-success btn-sm" onclick="addItem('/api/write/vacation/add',this,['staff_name','vacation_type','start_date'],{date:'${_writeDate}'})">+ 추가</button>
+  </div>` : '';
+
+  // ③ On-call
+  const oncallRows = d.oncall.map(r=>`
+    <div class="entry-row" id="row-o${r.id}">
+      <div class="info"><span class="badge badge-info">${esc(r.modality)}</span> <strong>${esc(r.staff_name)}</strong> ${r.start_time?esc(r.start_time)+'~'+esc(r.end_time):''} ${esc(r.note||'')}</div>
+      ${canEdit?`<div class="btns">
+        <button class="btn btn-sm btn-primary" onclick="editRow('o${r.id}')">수정</button>
+        <button class="btn btn-sm btn-danger" onclick="delItem('/api/write/oncall/delete/${r.id}')">삭제</button>
+      </div>`:''}
+    </div>
+    <div class="edit-form" id="edit-o${r.id}">
+      <div class="form-row col4">
+        <div><label>모달리티</label><select name="modality">${['CT','MRI','일반','전체'].map(v=>`<option${v===r.modality?' selected':''}>${v}</option>`).join('')}</select></div>
+        <div><label>담당자</label><input name="staff_name" value="${esc(r.staff_name)}" required></div>
+        <div><label>시작</label><input type="time" name="start_time" value="${esc(r.start_time||'')}"></div>
+        <div><label>종료</label><input type="time" name="end_time" value="${esc(r.end_time||'')}"></div>
+      </div>
+      <div class="form-row"><div><label>내용</label><input name="note" value="${esc(r.note||'')}"></div></div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-primary" onclick="saveEdit('/api/write/oncall/edit/${r.id}','o${r.id}',['modality','staff_name','start_time','end_time','note'])">저장</button>
+        <button class="btn btn-sm btn-secondary" onclick="cancelEdit('o${r.id}')">취소</button>
+      </div>
+    </div>`).join('');
+
+  const oncallAdd = canEdit ? `<div class="add-form">
+    <div class="form-row col4">
+      <div><label>모달리티</label><select name="modality"><option>CT</option><option>MRI</option><option>일반</option><option>전체</option></select></div>
+      <div><label>담당자</label><input name="staff_name" placeholder="홍길동" required></div>
+      <div><label>시작</label><input type="time" name="start_time"></div>
+      <div><label>종료</label><input type="time" name="end_time"></div>
+    </div>
+    <div class="form-row"><div><label>내용</label><input name="note" placeholder="내용"></div></div>
+    <button class="btn btn-primary btn-sm" onclick="addItem('/api/write/oncall/add',this,['modality','staff_name','start_time','end_time','note'],{date:'${_writeDate}'})">+ 추가</button>
+  </div>` : '';
+
+  // ④ 연장근무
+  const otRows = d.overtime.map(r=>`
+    <div class="entry-row" id="row-ot${r.id}">
+      <div class="info"><strong>${esc(r.staff_name)}</strong> ${esc(r.start_time)}~${esc(r.end_time)} (${r.hours}h) ${esc(r.reason)}</div>
+      ${canEdit?`<div class="btns">
+        <button class="btn btn-sm btn-primary" onclick="editRow('ot${r.id}')">수정</button>
+        <button class="btn btn-sm btn-danger" onclick="delItem('/api/write/overtime/delete/${r.id}')">삭제</button>
+      </div>`:''}
+    </div>
+    <div class="edit-form" id="edit-ot${r.id}">
+      <div class="form-row col3">
+        <div><label>성명</label><input name="staff_name" value="${esc(r.staff_name)}" required></div>
+        <div><label>시작</label><input type="time" name="start_time" value="${esc(r.start_time)}" required></div>
+        <div><label>종료</label><input type="time" name="end_time" value="${esc(r.end_time)}" required></div>
+      </div>
+      <div class="form-row"><div><label>사유</label><input name="reason" value="${esc(r.reason)}" required></div></div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-primary" onclick="saveEdit('/api/write/overtime/edit/${r.id}','ot${r.id}',['staff_name','start_time','end_time','reason'])">저장</button>
+        <button class="btn btn-sm btn-secondary" onclick="cancelEdit('ot${r.id}')">취소</button>
+      </div>
+    </div>`).join('');
+
+  const otAdd = canEdit ? `<div class="add-form">
+    <div class="form-row col3">
+      <div><label>성명</label><input name="staff_name" placeholder="홍길동" required></div>
+      <div><label>시작</label><input type="time" name="start_time" required></div>
+      <div><label>종료</label><input type="time" name="end_time" required></div>
+    </div>
+    <div class="form-row"><div><label>사유</label><input name="reason" placeholder="연장근무 사유" required></div></div>
+    <button class="btn btn-warning btn-sm" onclick="addItem('/api/write/overtime/add',this,['staff_name','start_time','end_time','reason'],{date:'${_writeDate}'})">+ 추가</button>
+  </div>` : '';
+
+  // ⑤ 장비
+  const eqRows = d.equipment.map(r=>`
+    <div class="entry-row" id="row-e${r.id}">
+      <div class="info"><span class="badge badge-danger">${esc(r.equipment)}</span> <span class="badge badge-warning">${esc(r.log_type)}</span> ${esc(r.description)} ${r.engineer?'('+esc(r.engineer)+')':''} <span class="badge ${r.status==='완료'?'badge-success':'badge-danger'}">${esc(r.status)}</span></div>
+      ${canEdit?`<div class="btns">
+        <button class="btn btn-sm btn-primary" onclick="editRow('e${r.id}')">수정</button>
+        <button class="btn btn-sm btn-danger" onclick="delItem('/api/write/equipment/delete/${r.id}')">삭제</button>
+      </div>`:''}
+    </div>
+    <div class="edit-form" id="edit-e${r.id}">
+      <div class="form-row col4">
+        <div><label>장비</label><input name="equipment" value="${esc(r.equipment)}" required></div>
+        <div><label>유형</label><select name="log_type">${['고장','점검','수리완료','PM'].map(v=>`<option${v===r.log_type?' selected':''}>${v}</option>`).join('')}</select></div>
+        <div><label>엔지니어</label><input name="engineer" value="${esc(r.engineer||'')}"></div>
+        <div><label>다운타임(h)</label><input type="number" name="downtime_hours" value="${r.downtime_hours||0}" step="0.5" min="0"></div>
+      </div>
+      <div class="form-row col2">
+        <div><label>내용</label><input name="description" value="${esc(r.description)}" required></div>
+        <div><label>상태</label><select name="status">${['처리중','완료'].map(v=>`<option${v===r.status?' selected':''}>${v}</option>`).join('')}</select></div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-primary" onclick="saveEdit('/api/write/equipment/edit/${r.id}','e${r.id}',['equipment','log_type','engineer','downtime_hours','description','status'])">저장</button>
+        <button class="btn btn-sm btn-secondary" onclick="cancelEdit('e${r.id}')">취소</button>
+      </div>
+    </div>`).join('');
+
+  const eqAdd = canEdit ? `<div class="add-form">
+    <div class="form-row col4">
+      <div><label>장비</label><input name="equipment" placeholder="CT1, MRI2..." required></div>
+      <div><label>유형</label><select name="log_type"><option>고장</option><option>점검</option><option>수리완료</option><option>PM</option></select></div>
+      <div><label>엔지니어</label><input name="engineer" placeholder="성명"></div>
+      <div><label>다운타임(h)</label><input type="number" name="downtime_hours" value="0" step="0.5" min="0"></div>
+    </div>
+    <div class="form-row col2">
+      <div><label>내용</label><input name="description" placeholder="상세 내용" required></div>
+      <div><label>상태</label><select name="status"><option>처리중</option><option>완료</option></select></div>
+    </div>
+    <button class="btn btn-danger btn-sm" onclick="addItem('/api/write/equipment/add',this,['equipment','log_type','engineer','downtime_hours','description','status'],{date:'${_writeDate}'})">+ 추가</button>
+  </div>` : '';
+
+  // ⑥ 인수인계
+  const hvRows = d.handover.map(r=>`
+    <div class="entry-row" id="row-h${r.id}">
+      <div class="info"><span class="badge badge-info">${esc(r.shift)}</span> ${esc(r.from_person)} → ${esc(r.to_person)} <span class="badge ${r.priority==='긴급'?'badge-danger':r.priority==='중요'?'badge-warning':'badge-secondary'}">${esc(r.priority)}</span><br><span style="font-size:12px;color:#555">${esc((r.content||'').slice(0,80))}${(r.content||'').length>80?'...':''}</span></div>
+      ${canEdit?`<div class="btns">
+        <button class="btn btn-sm btn-primary" onclick="editRow('h${r.id}')">수정</button>
+        <button class="btn btn-sm btn-danger" onclick="delItem('/api/write/handover/delete/${r.id}')">삭제</button>
+      </div>`:''}
+    </div>
+    <div class="edit-form" id="edit-h${r.id}">
+      <div class="form-row col4">
+        <div><label>근무조</label><select name="shift">${['오전','오후','야간'].map(v=>`<option${v===r.shift?' selected':''}>${v}</option>`).join('')}</select></div>
+        <div><label>인계자</label><input name="from_person" value="${esc(r.from_person)}" required></div>
+        <div><label>인수자</label><input name="to_person" value="${esc(r.to_person)}" required></div>
+        <div><label>우선순위</label><select name="priority">${['일반','중요','긴급'].map(v=>`<option${v===r.priority?' selected':''}>${v}</option>`).join('')}</select></div>
+      </div>
+      <div class="form-row"><div><label>내용</label><textarea name="content" required rows="2">${esc(r.content)}</textarea></div></div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-primary" onclick="saveEdit('/api/write/handover/edit/${r.id}','h${r.id}',['shift','from_person','to_person','priority','content'])">저장</button>
+        <button class="btn btn-sm btn-secondary" onclick="cancelEdit('h${r.id}')">취소</button>
+      </div>
+    </div>`).join('');
+
+  const hvAdd = canEdit ? `<div class="add-form">
+    <div class="form-row col4">
+      <div><label>근무조</label><select name="shift"><option>오전</option><option>오후</option><option>야간</option></select></div>
+      <div><label>인계자</label><input name="from_person" placeholder="홍길동" required></div>
+      <div><label>인수자</label><input name="to_person" placeholder="김철수" required></div>
+      <div><label>우선순위</label><select name="priority"><option>일반</option><option>중요</option><option>긴급</option></select></div>
+    </div>
+    <div class="form-row"><div><label>내용</label><textarea name="content" placeholder="인수인계 내용" required rows="2"></textarea></div></div>
+    <button class="btn btn-success btn-sm" onclick="addItem('/api/write/handover/add',this,['shift','from_person','to_person','priority','content'],{date:'${_writeDate}'})">+ 추가</button>
+  </div>` : '';
+
+  // ⑦ 이슈
+  const issRows = d.issues.map(r=>`
+    <div class="entry-row" id="row-i${r.id}">
+      <div class="info"><span class="badge badge-info">${esc(r.category)}</span> <span class="badge ${r.severity==='긴급'?'badge-danger':r.severity==='중요'?'badge-warning':'badge-secondary'}">${esc(r.severity)}</span> <strong>${esc(r.title)}</strong> <span class="badge ${r.status==='진행중'?'badge-danger':r.status==='해결'?'badge-success':'badge-secondary'}">${esc(r.status)}</span></div>
+      ${canEdit?`<div class="btns">
+        <button class="btn btn-sm btn-primary" onclick="editRow('i${r.id}')">수정</button>
+        <button class="btn btn-sm btn-danger" onclick="delItem('/api/write/issue/delete/${r.id}')">삭제</button>
+      </div>`:''}
+    </div>
+    <div class="edit-form" id="edit-i${r.id}">
+      <div class="form-row col4">
+        <div><label>구분</label><select name="category">${['장비','환자','행정','기타'].map(v=>`<option${v===r.category?' selected':''}>${v}</option>`).join('')}</select></div>
+        <div><label>심각도</label><select name="severity">${['일반','중요','긴급'].map(v=>`<option${v===r.severity?' selected':''}>${v}</option>`).join('')}</select></div>
+        <div><label>상태</label><select name="status">${['진행중','해결','보류'].map(v=>`<option${v===r.status?' selected':''}>${v}</option>`).join('')}</select></div>
+        <div><label>제목</label><input name="title" value="${esc(r.title)}" required></div>
+      </div>
+      <div class="form-row"><div><label>내용</label><textarea name="content" required rows="2">${esc(r.content)}</textarea></div></div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-primary" onclick="saveEdit('/api/write/issue/edit/${r.id}','i${r.id}',['category','severity','status','title','content'])">저장</button>
+        <button class="btn btn-sm btn-secondary" onclick="cancelEdit('i${r.id}')">취소</button>
+      </div>
+    </div>`).join('');
+
+  const issAdd = canEdit ? `<div class="add-form">
+    <div class="form-row col4">
+      <div><label>구분</label><select name="category"><option>장비</option><option>환자</option><option>행정</option><option>기타</option></select></div>
+      <div><label>심각도</label><select name="severity"><option>일반</option><option>중요</option><option>긴급</option></select></div>
+      <div><label>상태</label><select name="status"><option>진행중</option><option>해결</option><option>보류</option></select></div>
+      <div><label>제목</label><input name="title" placeholder="이슈 제목" required></div>
+    </div>
+    <div class="form-row"><div><label>내용</label><textarea name="content" placeholder="상세 내용" required rows="2"></textarea></div></div>
+    <button class="btn btn-sm" style="background:#8e24aa;color:#fff" onclick="addItem('/api/write/issue/add',this,['category','severity','status','title','content'],{date:'${_writeDate}'})">+ 추가</button>
+  </div>` : '';
+
+  document.getElementById('content').innerHTML = `
+    <h1 style="text-align:center;font-size:22px;font-weight:700;color:#1e2a3a;margin-bottom:16px;letter-spacing:1px">영상의학과 업무일지</h1>
+    <div class="date-bar">
+      <span style="font-weight:700;color:#555">날짜 선택</span>
+      <input type="date" id="write-date" value="${_writeDate}" onchange="nav('write',{date:this.value})">
+      <span style="color:#1e2a3a;font-size:15px;font-weight:600">${_writeDate} 업무일지</span>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        ${isAdmin?`<button class="btn btn-danger" onclick="resetDate()">🔄 초기화</button>`:''}
+        <button class="btn btn-secondary" onclick="nav('print',{date:'${_writeDate}'})">🖨️ 인쇄</button>
+      </div>
+    </div>
+    ${accSection('r','roster-h','👥','근무자 현황',d.roster, `<div class="entry-list">${rosterRows}</div>${rosterAdd}`)}
+    ${accSection('v','vacation-h','🌴','휴가 현황',d.vacation, `<div class="entry-list">${vacRows}</div>${vacAdd}`)}
+    ${accSection('o','oncall-h','📱','On-call',d.oncall, `<div class="entry-list">${oncallRows}</div>${oncallAdd}`)}
+    ${accSection('ot','overtime-h','⏰','연장근무',d.overtime, `<div class="entry-list">${otRows}</div>${otAdd}`)}
+    ${accSection('e','equip-h','🔧','장비 이력',d.equipment, `<div class="entry-list">${eqRows}</div>${eqAdd}`)}
+    ${accSection('h','handover-h','🔄','인수인계',d.handover, `<div class="entry-list">${hvRows}</div>${hvAdd}`)}
+    ${accSection('i','issue-h','⚠️','특이사항·이슈',d.issues, `<div class="entry-list">${issRows}</div>${issAdd}`)}
+    <div style="text-align:center;margin-top:30px;margin-bottom:60px">
+      ${statusBadge ? `<div style="margin-bottom:12px">${statusBadge}</div>` : ''}
+      ${canEdit ? `<button class="btn btn-primary" onclick="handleSave()" style="padding:12px 60px;font-size:15px;font-weight:700;border-radius:8px;box-shadow:0 2px 8px rgba(26,115,232,.4)">💾 저장</button>` : ''}
+    </div>`;
+}
+
+// ── 작성 페이지 공통 헬퍼 ──
+function editRow(id) {
+  document.getElementById('row-' + id).style.display = 'none';
+  document.getElementById('edit-' + id).style.display = 'block';
+}
+function cancelEdit(id) {
+  document.getElementById('row-' + id).style.display = 'flex';
+  document.getElementById('edit-' + id).style.display = 'none';
+}
+
+function getFields(container, fields) {
+  const data = {};
+  fields.forEach(f => {
+    const el = container.querySelector(`[name="${f}"]`);
+    data[f] = el ? el.value : '';
+  });
+  return data;
+}
+
+async function saveEdit(url, rowId, fields) {
+  const container = document.getElementById('edit-' + rowId);
+  const data = getFields(container, fields);
+  const r = await api(url, data);
+  if (r.ok) renderWrite(_writeDate);
+  else alert(r.msg || '저장 실패');
+}
+
+async function addItem(url, btn, fields, extra) {
+  const container = btn.closest('.add-form');
+  const data = {...getFields(container, fields), ...extra};
+  const r = await api(url, data);
+  if (r.ok) renderWrite(_writeDate);
+  else alert(r.msg || '추가 실패');
+}
+
+async function delItem(url) {
+  if (!confirm('삭제하시겠습니까?')) return;
+  const r = await api(url, {});
+  if (r.ok) renderWrite(_writeDate);
+  else alert(r.msg || '삭제 실패');
+}
+
+async function resetDate() {
+  if (!confirm(_writeDate + ' 날짜의 모든 데이터를 초기화하시겠습니까?')) return;
+  const r = await api('/api/write/reset/' + _writeDate, {});
+  if (r.ok) renderWrite(_writeDate);
+}
+
+async function handleSave() {
+  if (confirm('업무일지가 저장되었습니다.\n제출하시겠습니까?')) {
+    const r = await api('/api/worklog/submit/' + _writeDate, {});
+    if (r.ok) nav('worklog');
+    else alert(r.msg || '제출 실패');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// 업무일지 리스트
+// ═══════════════════════════════════════════════════
+async function renderWorklog() {
+  const d = await api('/api/worklog');
+  if (!d.ok) return;
+
+  function dot(n) { return `<span class="dot ${n?'filled':'empty'}">${n||'-'}</span>`; }
+
+  const rows = d.logs.map(log => `<tr>
+    <td>${log.date}</td>
+    <td>${log.rejected ? `<span class="badge-rejected">반려 (${esc(log.rejected_by)})</span>` : `<span class="badge-submitted">제출</span>`}</td>
+    <td>${dot(log.roster)}</td>
+    <td>${dot(log.vacation)}</td>
+    <td>${dot(log.oncall)}</td>
+    <td>${dot(log.overtime)}</td>
+    <td>${dot(log.equipment)}</td>
+    <td>${dot(log.handover)}</td>
+    <td>${dot(log.issues)}</td>
+    <td>
+      ${ME?.role === 'admin' ? `
+        <a href="#" onclick="nav('write',{date:'${log.date}'});return false" class="btn btn-sm btn-primary">수정</a>
+        <a href="#" onclick="nav('print',{date:'${log.date}'});return false" class="btn btn-sm btn-secondary">인쇄</a>
+        ${log.rejected
+          ? `<a href="#" onclick="unrejectLog('${log.date}');return false" class="btn btn-sm btn-success">반려취소</a>`
+          : `<button class="btn btn-sm btn-warning" onclick="openRejectModal('${log.date}')">반려</button>`}
+      ` : log.rejected ? `
+        <a href="#" onclick="nav('write',{date:'${log.date}'});return false" class="btn btn-sm btn-primary">수정</a>
+        <a href="#" onclick="nav('print',{date:'${log.date}'});return false" class="btn btn-sm btn-secondary">인쇄</a>
+      ` : `
+        <a href="#" onclick="nav('print',{date:'${log.date}'});return false" class="btn btn-sm btn-secondary">인쇄</a>
+      `}
+    </td>
+  </tr>`).join('') || `<tr><td colspan="10" style="padding:24px;color:#888">제출된 업무일지가 없습니다. <a href="#" onclick="nav('write');return false">작성하기</a></td></tr>`;
+
+  // 반려 모달 사용자 목록
+  document.getElementById('rejectUserSelect').innerHTML = d.users.map(u=>`<option value="${esc(u.username)}">${esc(u.name)} (${esc(u.username)})</option>`).join('');
+
+  document.getElementById('content').innerHTML = `
+  <div class="table-wrap">
+    <div class="table-header">
+      <h2>업무일지 리스트</h2>
+      <a href="#" onclick="nav('write');return false" class="btn btn-primary">+ 오늘 작성</a>
+    </div>
+    <table class="log-table">
+      <thead><tr>
+        <th>날짜</th><th>상태</th><th>👥 근무자</th><th>🌴 휴가</th><th>📱 On-call</th>
+        <th>⏰ 연장근무</th><th>🔧 장비이력</th><th>🔄 인수인계</th><th>⚠️ 이슈</th><th>관리</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+function openRejectModal(date) {
+  _rejectDate = date;
+  document.getElementById('rejectModalDate').textContent = date + ' 업무일지를 반려합니다.';
+  document.getElementById('rejectModal').style.display = 'flex';
+}
+function closeRejectModal() { document.getElementById('rejectModal').style.display = 'none'; }
+document.getElementById('rejectModal').addEventListener('click', e => { if (e.target === document.getElementById('rejectModal')) closeRejectModal(); });
+
+async function confirmReject() {
+  if (!confirm('선택한 사용자에게 반려하시겠습니까?')) return;
+  const target = document.getElementById('rejectUserSelect').value;
+  const r = await api('/api/worklog/reject/' + _rejectDate, {target_user: target});
+  closeRejectModal();
+  if (r.ok) renderWorklog();
+}
+
+async function unrejectLog(date) {
+  if (!confirm('반려를 취소하시겠습니까?')) return;
+  const r = await api('/api/worklog/unreject/' + date, {});
+  if (r.ok) renderWorklog();
+}
+
+// ═══════════════════════════════════════════════════
+// 인쇄 뷰
+// ═══════════════════════════════════════════════════
+async function renderPrint(date) {
+  const d = await api('/api/print/' + (date || new Date().toISOString().slice(0,10)));
+  if (!d.ok) return;
+
+  function pSection(title, headers, rows, colFn) {
+    const body = rows.length
+      ? `<table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${colFn(r)}</tr>`).join('')}</tbody></table>`
+      : `<div class="empty-msg">해당 없음</div>`;
+    return `<div class="psection"><div class="psection-title">${title}</div>${body}</div>`;
+  }
+
+  document.getElementById('content').innerHTML = `
+  <div class="no-print" style="margin-bottom:12px">
+    <button onclick="window.print()" style="padding:8px 20px;background:#1a73e8;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">🖨️ 인쇄</button>
+    <button onclick="nav('worklog')" style="padding:8px 16px;background:#6c757d;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;margin-left:8px">닫기</button>
+  </div>
+  <div class="print-wrap" style="background:#fff;font-size:12px">
+    <table class="print-header-tbl">
+      <tr>
+        <td class="print-header-title">
+          <h1>영상의학과 업무일지</h1>
+          <div class="sub">${d.date_str} &nbsp;|&nbsp; 작성일시: ${d.now}</div>
+        </td>
+        <td style="width:192px;padding-left:16px;padding-bottom:12px">
+          <table class="approval-box">
+            <thead><tr><th>파트장</th><th>팀장</th><th>진료과장</th></tr></thead>
+            <tbody><tr><td></td><td></td><td></td></tr></tbody>
+          </table>
+        </td>
+      </tr>
+    </table>
+    ${pSection('👥 근무자 현황',['근무조','성명','직종','비고'],d.roster, r=>`<td>${esc(r.shift)}</td><td>${esc(r.staff_name)}</td><td>${esc(r.role||'-')}</td><td>${esc(r.note||'-')}</td>`)}
+    ${pSection('🌴 휴가 현황',['성명','구분','날짜'],d.vacation, r=>`<td>${esc(r.staff_name)}</td><td>${esc(r.vacation_type)}</td><td>${esc(r.start_date)}</td>`)}
+    ${pSection('📱 On-call',['모달리티','담당자','시간','내용'],d.oncall, r=>`<td>${esc(r.modality)}</td><td>${esc(r.staff_name)}</td><td>${r.start_time?esc(r.start_time)+'~'+esc(r.end_time):'-'}</td><td>${esc(r.note||'-')}</td>`)}
+    ${pSection('⏰ 연장근무',['성명','시작','종료','시간','사유'],d.overtime, r=>`<td>${esc(r.staff_name)}</td><td>${esc(r.start_time)}</td><td>${esc(r.end_time)}</td><td>${r.hours}h</td><td>${esc(r.reason)}</td>`)}
+    ${pSection('🔧 장비 이력',['장비','유형','내용','엔지니어','다운타임','상태'],d.equipment, r=>`<td>${esc(r.equipment)}</td><td>${esc(r.log_type)}</td><td>${esc(r.description)}</td><td>${esc(r.engineer||'-')}</td><td>${r.downtime_hours}h</td><td>${esc(r.status)}</td>`)}
+    ${pSection('🔄 인수인계',['근무조','인계자','인수자','우선순위','내용'],d.handover, r=>`<td>${esc(r.shift)}</td><td>${esc(r.from_person)}</td><td>${esc(r.to_person)}</td><td>${esc(r.priority)}</td><td>${esc(r.content)}</td>`)}
+    ${pSection('⚠️ 특이사항·이슈',['구분','심각도','제목','내용','작성자','상태'],d.issues, r=>`<td>${esc(r.category)}</td><td>${esc(r.severity)}</td><td>${esc(r.title)}</td><td>${esc(r.content)}</td><td>${esc(r.author||'')}</td><td>${esc(r.status)}</td>`)}
+    <div class="print-footer">
+      <span>중앙대학교병원 영상의학과</span>
+      <span>${d.date_str}</span>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════
+// 사용자 관리
+// ═══════════════════════════════════════════════════
+async function renderUsers() {
+  if (ME?.role !== 'admin') { nav('dashboard'); return; }
+  const d = await api('/api/users');
+  if (!d.ok) return;
+
+  let addFormOpen = false;
+  function toggleAddForm() {
+    addFormOpen = !addFormOpen;
+    document.getElementById('user-add-form').style.display = addFormOpen ? '' : 'none';
+  }
+
+  const rows = d.users.map(u=>`<tr>
+    <td>${u.id}</td><td>${esc(u.username)}</td><td>${esc(u.name)}</td>
+    <td><span class="badge ${u.role==='admin'?'badge-danger':'badge-secondary'}">${u.role==='admin'?'관리자':'사용자'}</span></td>
+    <td>${esc(u.created_at||'')}</td>
+    <td>${u.username !== 'admin' ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">삭제</button>` : ''}</td>
+  </tr>`).join('');
+
+  document.getElementById('content').innerHTML = `
+  <div class="table-wrap" style="margin-bottom:20px">
+    <div class="table-header">
+      <h2>사용자 관리</h2>
+      <button class="btn btn-primary" onclick="toggleAddForm()">+ 사용자 추가</button>
+    </div>
+    <table>
+      <thead><tr><th>ID</th><th>아이디</th><th>이름</th><th>권한</th><th>생성일</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>
+  <div id="user-add-form" class="form-container" style="display:none">
+    <div class="form-title">사용자 추가</div>
+    <div class="grid-2">
+      <div class="form-group"><label>아이디</label><input id="u-username" placeholder="아이디"></div>
+      <div class="form-group"><label>이름</label><input id="u-name" placeholder="홍길동"></div>
+      <div class="form-group"><label>비밀번호</label><input id="u-pw" type="password" placeholder="비밀번호"></div>
+      <div class="form-group"><label>권한</label><select id="u-role"><option value="user">사용자</option><option value="admin">관리자</option></select></div>
+    </div>
+    <button class="btn btn-primary" onclick="addUser()">추가</button>
+    <button class="btn btn-secondary" style="margin-left:8px" onclick="toggleAddForm()">취소</button>
+  </div>`;
+
+  window.toggleAddForm = toggleAddForm;
+}
+
+async function addUser() {
+  const r = await api('/api/users/add', {
+    username: document.getElementById('u-username').value,
+    password: document.getElementById('u-pw').value,
+    name: document.getElementById('u-name').value,
+    role: document.getElementById('u-role').value,
+  });
+  if (r.ok) renderUsers();
+  else alert(r.msg || '추가 실패');
+}
+
+async function deleteUser(id) {
+  if (!confirm('삭제하시겠습니까?')) return;
+  const r = await api('/api/users/delete/' + id, {});
+  if (r.ok) renderUsers();
+}
+
+// ── 세션 확인 후 시작 ──
+(async function init() {
+  document.getElementById('inp-pw').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('inp-user').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('inp-pw').focus(); });
+  const r = await api('/api/me');
+  if (r.ok) {
+    ME = r;
+    document.getElementById('login-page').style.display = 'none';
+    document.getElementById('app-page').style.display = '';
+    document.getElementById('sf-name').textContent = r.name;
+    document.getElementById('sf-role').textContent = r.role === 'admin' ? '관리자' : '사용자';
+    document.querySelectorAll('.admin-only').forEach(el => el.style.display = r.role === 'admin' ? '' : 'none');
+    nav('dashboard');
+  } else if (!r.ok && r.msg && r.msg.includes('연결')) {
+    const el = document.getElementById('login-alert');
+    el.textContent = r.msg;
+    el.style.display = '';
+  }
+})();
+</script>
+</body>
+</html>
