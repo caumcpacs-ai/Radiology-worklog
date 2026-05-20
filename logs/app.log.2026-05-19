@@ -1,0 +1,7 @@
+2026-05-19 09:41:18,912 [INFO] oncall add date=2026-05-19 part=인터벤션 staff=소형호 by=소형호
+2026-05-19 09:42:38,786 [INFO] oncall add date=2026-05-19 part=인터벤션 staff=정현영 by=정현영
+2026-05-19 09:42:54,965 [INFO] oncall edit id=15 by=정현영
+2026-05-19 09:45:04,370 [INFO] oncall add date=2026-05-19 part=GR staff= by=소형호
+2026-05-19 21:26:08,600 [INFO] oncall add date=2026-05-19 part=인터벤션 staff=최진영,정석민 by=주영탁
+2026-05-19 21:52:10,186 [INFO] oncall add date=2026-05-19 part=GR staff=차현석 by=차현석
+2026-05-19 21:52:35,250 [INFO] oncall edit id=18 by=차현석

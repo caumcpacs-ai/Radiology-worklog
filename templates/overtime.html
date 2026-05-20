@@ -17,7 +17,7 @@
         <td><strong>{{ r.staff_name }}</strong></td>
         <td>{{ r.start_time }}</td>
         <td>{{ r.end_time }}</td>
-        <td><span class="badge badge-warning">{{ r.hours }}h</span></td>
+        <td><span class="badge badge-warning">{{ format_hh_mm(r.hours) if r.hours else '' }}</span></td>
         <td>{{ r.reason }}</td>
         <td>{{ r.approved_by or '-' }}</td>
         <td>

@@ -97,14 +97,20 @@ label{display:block;margin-bottom:4px;font-weight:500;color:#555}
     <a href="{{ url_for('dashboard') }}"    class="{{ 'active' if request.endpoint=='dashboard' }}">📊 메인</a>
     <a href="{{ url_for('write') }}"        class="{{ 'active' if 'write' in request.endpoint }}">✏️ 업무일지 작성</a>
     <a href="{{ url_for('worklog_list') }}" class="{{ 'active' if request.endpoint=='worklog_list' }}">📋 업무일지 리스트</a>
+    <div class="nav-section">근무 현황</div>
+    <a href="{{ url_for('oncall_list') }}"   style="padding-left:24px;font-size:12px" class="{{ 'active' if request.endpoint=='oncall_list' }}">📞 On-call 리스트</a>
+    <a href="{{ url_for('overtime_list') }}" style="padding-left:24px;font-size:12px" class="{{ 'active' if request.endpoint=='overtime_list' }}">⏰ 연장근무 리스트</a>
+    <div class="nav-section">장비 현황</div>
+    <a href="{{ url_for('special_equipment_list') }}" style="padding-left:24px;font-size:12px" class="{{ 'active' if request.endpoint=='special_equipment_list' }}">🏥 특수의료장비현황</a>
+    <a href="{{ url_for('radiation_device_list') }}"  style="padding-left:24px;font-size:12px" class="{{ 'active' if request.endpoint=='radiation_device_list' }}">☢️ 진단용방사선발생장치</a>
     {% if session.role == 'admin' %}
     <div class="nav-section">관리</div>
     <a href="{{ url_for('users') }}" class="{{ 'active' if 'user' in request.endpoint }}">👥 사용자 관리</a>
     {% endif %}
   </nav>
-  <div class="sidebar-footer">
-    👤 {{ session.name }} ({{ '관리자' if session.role == 'admin' else '사용자' }})<br>
-    <a href="{{ url_for('logout') }}" style="color:#ef9a9a">로그아웃</a>
+  <div class="sidebar-footer" style="display:flex;flex-direction:column;align-items:flex-start;gap:8px">
+    <div>👤 <a href="{{ url_for('profile') }}" style="color:#fff;text-decoration:underline">{{ session.name }}</a> ({{ '관리자' if session.role == 'admin' else '사용자' }})</div>
+    <div><a href="{{ url_for('logout') }}" style="color:#ef9a9a">로그아웃</a></div>
   </div>
 </div>
 

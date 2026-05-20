@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block page_title %}특수의료장비현황{% endblock %}
+{% block content %}
+<style>
+.eq-table th{background:#f0f4ff;font-size:12px;padding:7px 8px;white-space:nowrap}
+.eq-table td{padding:7px 8px;vertical-align:middle;font-size:12px}
+.eq-toolbar{display:flex;justify-content:flex-end;margin-bottom:10px}
+.btn-group{display:flex;gap:4px;flex-wrap:wrap}
+
+/* ── 모달 ── */
+.eq-modal-bg{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:600;align-items:center;justify-content:center;overflow-y:auto}
+.eq-modal-bg.open{display:flex}
+.eq-modal{background:#fff;border-radius:10px;padding:28px;width:560px;max-width:96vw;box-shadow:0 6px 32px rgba(0,0,0,.2);max-height:90vh;overflow-y:auto}
+.eq-modal h3{font-size:15px;margin-bottom:18px;color:#222}
+.eq-modal .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.eq-modal .form-row.full{grid-template-columns:1fr}
+.eq-modal label{font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px}
+.eq-modal input,.eq-modal textarea{width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:5px;font-size:13px;box-sizing:border-box}
+.eq-modal .modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+</style>
+
+<div class="eq-toolbar">
+  <button class="btn btn-primary btn-sm" onclick="openSpModal()">+ 신규 추가</button>
+</div>
+<div class="table-wrap">
+  <table class="eq-table">
+    <thead>
+      <tr>
+        <th>No</th>
+        <th>고유제조번호</th>
+        <th>구분</th>
+        <th>S/N</th>
+        <th>장비명</th>
+        <th>관리자</th>
+        <th>방사선사1</th>
+        <th>방사선사2</th>
+        <th>비고</th>
+        <th>관리</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for eq in special_equips %}
+    <tr>
+      <td style="color:#aaa">{{ loop.index }}</td>
+      <td>{{ eq.unique_serial }}</td>
+      <td><span class="badge badge-info" style="font-size:11px">{{ eq.category }}</span></td>
+      <td>{{ eq.sn }}</td>
+      <td style="font-weight:600">{{ eq.equipment_name }}</td>
+      <td>{{ eq.manager }}</td>
+      <td>{{ eq.radiographer1 }}</td>
+      <td>{{ eq.radiographer2 }}</td>
+      <td style="color:#666;font-size:11px">{{ eq.note }}</td>
+      <td>
+        <div class="btn-group">
+          <button class="btn btn-sm btn-warning"
+            onclick="openSpEditModal({{ eq.id }},
+              '{{ eq.unique_serial|e }}','{{ eq.category|e }}','{{ eq.sn|e }}',
+              '{{ eq.equipment_name|e }}','{{ eq.manager|e }}',
+              '{{ eq.radiographer1|e }}','{{ eq.radiographer2|e }}','{{ eq.note|e }}')">수정</button>
+          <form method="post" action="/special-equipment/delete/{{ eq.id }}" style="display:inline"
+                onsubmit="return confirm('삭제하시겠습니까?')">
+            <button class="btn btn-sm btn-danger">삭제</button>
+          </form>
+        </div>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="10" style="text-align:center;color:#aaa;padding:24px">등록된 특수의료장비가 없습니다.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- 추가/수정 모달 -->
+<div class="eq-modal-bg" id="spModal">
+  <div class="eq-modal">
+    <h3 id="spModalTitle">특수의료장비 신규 추가</h3>
+    <form method="post" id="spForm" action="/special-equipment/add">
+      <div class="form-row">
+        <div>
+          <label>고유제조번호</label>
+          <input type="text" name="unique_serial" id="sp_unique_serial" placeholder="예) 3190000-01-202202-00001">
+        </div>
+        <div>
+          <label>구분</label>
+          <input type="text" name="category" id="sp_category" placeholder="예) MRI, CT, Mammo">
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label>S/N</label>
+          <input type="text" name="sn" id="sp_sn" placeholder="시리얼 번호">
+        </div>
+        <div>
+          <label>장비명 <span style="color:red">*</span></label>
+          <input type="text" name="equipment_name" id="sp_equipment_name" required placeholder="장비명">
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label>관리자</label>
+          <input type="text" name="manager" id="sp_manager" placeholder="관리자 성명">
+        </div>
+        <div>
+          <label>방사선사1</label>
+          <input type="text" name="radiographer1" id="sp_radiographer1" placeholder="방사선사1 성명">
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label>방사선사2</label>
+          <input type="text" name="radiographer2" id="sp_radiographer2" placeholder="방사선사2 성명">
+        </div>
+        <div>
+          <label>비고</label>
+          <input type="text" name="note" id="sp_note" placeholder="비고">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeSpModal()">취소</button>
+        <button type="submit" class="btn btn-primary" id="spSaveBtn">저장</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openSpModal() {
+  document.getElementById('spModalTitle').textContent = '특수의료장비 신규 추가';
+  document.getElementById('spForm').action = '/special-equipment/add';
+  document.getElementById('spSaveBtn').textContent = '저장';
+  ['unique_serial','category','sn','equipment_name','manager','radiographer1','radiographer2','note'].forEach(function(f) {
+    document.getElementById('sp_' + f).value = '';
+  });
+  document.getElementById('spModal').classList.add('open');
+}
+
+function openSpEditModal(id, unique_serial, category, sn, equipment_name, manager, radiographer1, radiographer2, note) {
+  document.getElementById('spModalTitle').textContent = '특수의료장비 수정';
+  document.getElementById('spForm').action = '/special-equipment/edit/' + id;
+  document.getElementById('spSaveBtn').textContent = '저장';
+  document.getElementById('sp_unique_serial').value = unique_serial;
+  document.getElementById('sp_category').value = category;
+  document.getElementById('sp_sn').value = sn;
+  document.getElementById('sp_equipment_name').value = equipment_name;
+  document.getElementById('sp_manager').value = manager;
+  document.getElementById('sp_radiographer1').value = radiographer1;
+  document.getElementById('sp_radiographer2').value = radiographer2;
+  document.getElementById('sp_note').value = note;
+  document.getElementById('spModal').classList.add('open');
+}
+
+function closeSpModal() {
+  document.getElementById('spModal').classList.remove('open');
+}
+
+document.getElementById('spModal').addEventListener('click', function(e) {
+  if (e.target === this) closeSpModal();
+});
+</script>
+{% endblock %}

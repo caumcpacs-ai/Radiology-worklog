@@ -1,275 +1,307 @@
-{% extends 'base.html' %}
-{% block page_title %}📊 대시보드{% endblock %}
+{% extends "base.html" %}
+{% block page_title %}대시보드{% endblock %}
 {% block content %}
 <style>
-/* KPI 툴팁 */
-.stat-card { position:relative; overflow:visible !important; }
-.kpi-tooltip {
-  display:none;
-  position:absolute;
-  top:calc(100% + 8px);
-  left:50%;
-  transform:translateX(-50%);
-  background:#fff;
-  border:1px solid #ddd;
-  border-radius:8px;
-  box-shadow:0 6px 20px rgba(0,0,0,.15);
-  padding:12px 14px;
-  z-index:200;
-  min-width:260px;
-  max-width:400px;
-  font-size:12px;
-  text-align:left;
-  pointer-events:none;
-  white-space:normal;
-}
-.kpi-tooltip::before {
-  content:''; position:absolute; top:-6px; left:50%; transform:translateX(-50%);
-  border:6px solid transparent; border-bottom-color:#ddd; border-top:none;
-}
-.kpi-tooltip::after {
-  content:''; position:absolute; top:-5px; left:50%; transform:translateX(-50%);
-  border:6px solid transparent; border-bottom-color:#fff; border-top:none;
-}
-.stat-card:hover .kpi-tooltip { display:block; }
-.lbl { cursor:default; }
-.kpi-tooltip .tt-title { font-weight:700; color:#1e2a3a; margin-bottom:8px; font-size:12px; border-bottom:1px solid #eee; padding-bottom:5px; }
-.kpi-tooltip table { width:100%; border-collapse:collapse; }
-.kpi-tooltip td { padding:3px 5px; vertical-align:top; border-bottom:1px solid #f5f5f5; }
-.kpi-tooltip tr:last-child td { border-bottom:none; }
-.kpi-tooltip .empty-msg { color:#aaa; font-style:italic; }
-/* 근무조 뱃지 */
-.shift-badge { display:inline-block; padding:1px 7px; border-radius:10px; font-size:11px; font-weight:600; }
-.shift-오전 { background:#e3f2fd; color:#1565c0; }
-.shift-종일 { background:#e8f5e9; color:#2e7d32; }
-.shift-야간 { background:#fce4ec; color:#c62828; }
-/* 대시보드 그리드 */
-.dash-2col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+.tab-bar{display:flex;gap:0;margin-bottom:16px;background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.1);overflow:hidden}
+.tab-btn{flex:1;padding:12px 16px;border:none;background:#f8f9fa;color:#555;font-size:14px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;transition:.2s;font-family:inherit}
+.tab-btn.active{background:#fff;color:#1a73e8;border-bottom-color:#1a73e8}
+.tab-btn:hover:not(.active){background:#eef2ff}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+.section-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.dash-section{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.1);overflow:hidden}
+.dash-section-full{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.1);overflow:hidden;margin-bottom:16px}
+.dash-title{padding:10px 16px;font-weight:700;font-size:13px;color:#1a73e8;border-bottom:1px solid #e0e0e0;background:#f8f9fa;display:flex;justify-content:space-between;align-items:center}
+.dash-body{padding:12px 16px;font-size:13px}
+.dash-body table{font-size:13px}
+.dash-body th{background:#f0f4ff;font-size:12px;padding:6px 10px}
+.dash-body td{padding:6px 10px}
+.roster-group{margin-bottom:8px;font-size:13px}
+.roster-group .group-label{font-weight:700;color:#1a73e8;margin-bottom:2px}
+.roster-group .names{color:#333}
+.empty-msg{color:#aaa;font-size:12px;padding:8px 0}
+.date-badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:700;background:#e8f0fe;color:#1a73e8;margin-left:6px}
 </style>
 
-<!-- ── KPI 카드 6개 ── -->
-<div class="stat-grid" style="grid-template-columns:repeat(6,1fr);margin-bottom:20px">
-
-  <!-- 미해결 이슈 -->
-  <div class="stat-card red">
-    <div class="num">{{ issues_open_rows|length }}</div>
-    <div class="lbl">⚠️ 미해결 이슈</div>
-    <div class="kpi-tooltip">
-      <div class="tt-title">⚠️ 미해결 이슈 ({{ issues_open_rows|length }}건)</div>
-      {% if issues_open_rows %}
-      <table>{% for r in issues_open_rows %}<tr>
-        <td><span class="badge {{ 'badge-danger' if r.severity=='긴급' else 'badge-warning' if r.severity=='중요' else 'badge-secondary' }}">{{ r.severity }}</span></td>
-        <td style="font-weight:600">{{ r.title }}</td>
-        <td style="color:#888">{{ r.date }}</td>
-      </tr>{% endfor %}</table>
-      {% else %}<div class="empty-msg">없음</div>{% endif %}
-    </div>
-  </div>
-
-  <!-- 오늘 이슈 -->
-  <div class="stat-card blue" style="border-left-color:#1a73e8">
-    <div class="num" style="color:#1a73e8">{{ issues_today|length }}</div>
-    <div class="lbl">📋 오늘 이슈</div>
-    <div class="kpi-tooltip">
-      <div class="tt-title">📋 오늘 이슈 ({{ issues_today|length }}건)</div>
-      {% if issues_today %}
-      <table>{% for r in issues_today %}<tr>
-        <td><span class="badge {{ 'badge-danger' if r.severity=='긴급' else 'badge-warning' if r.severity=='중요' else 'badge-secondary' }}">{{ r.severity }}</span></td>
-        <td style="font-weight:600">{{ r.title }}</td>
-        <td style="color:#888">{{ r.category }}</td>
-      </tr>{% endfor %}</table>
-      {% else %}<div class="empty-msg">없음</div>{% endif %}
-    </div>
-  </div>
-
-  <!-- 오늘 인수인계 -->
-  <div class="stat-card green">
-    <div class="num">{{ handover_today|length }}</div>
-    <div class="lbl">🔄 오늘 인수인계</div>
-    <div class="kpi-tooltip">
-      <div class="tt-title">🔄 오늘 인수인계 ({{ handover_today|length }}건)</div>
-      {% if handover_today %}
-      <table>{% for r in handover_today %}<tr>
-        <td><span class="badge {{ 'badge-danger' if r.priority=='긴급' else 'badge-warning' if r.priority=='중요' else 'badge-secondary' }}">{{ r.priority }}</span></td>
-        <td>{{ r.from_person }}→{{ r.to_person }}</td>
-        <td style="color:#555">{{ r.content[:25] }}{% if r.content|length>25 %}…{% endif %}</td>
-      </tr>{% endfor %}</table>
-      {% else %}<div class="empty-msg">없음</div>{% endif %}
-    </div>
-  </div>
-
-  <!-- 장비 처리중 -->
-  <div class="stat-card yellow">
-    <div class="num">{{ equip_active_rows|length }}</div>
-    <div class="lbl">🔧 장비 처리중</div>
-    <div class="kpi-tooltip">
-      <div class="tt-title">🔧 처리중인 장비 ({{ equip_active_rows|length }}건)</div>
-      {% if equip_active_rows %}
-      <table>{% for r in equip_active_rows %}<tr>
-        <td style="font-weight:600">{{ r.equipment }}</td>
-        <td><span class="badge badge-warning">{{ r.log_type }}</span></td>
-        <td style="color:#555">{{ r.description[:25] }}{% if r.description|length>25 %}…{% endif %}</td>
-      </tr>{% endfor %}</table>
-      {% else %}<div class="empty-msg">없음</div>{% endif %}
-    </div>
-  </div>
-
-  <!-- 오늘 휴가 -->
-  <div class="stat-card purple">
-    <div class="num">{{ vacation_today|length }}</div>
-    <div class="lbl">🌴 오늘 휴가</div>
-    <div class="kpi-tooltip">
-      <div class="tt-title">🌴 오늘 휴가 ({{ vacation_today|length }}건)</div>
-      {% if vacation_today %}
-      <table>{% for r in vacation_today %}<tr>
-        <td style="font-weight:600">{{ r.staff_name }}</td>
-        <td><span class="badge badge-info">{{ r.vacation_type }}</span></td>
-        <td style="color:#888">{{ r.start_date }}</td>
-      </tr>{% endfor %}</table>
-      {% else %}<div class="empty-msg">없음</div>{% endif %}
-    </div>
-  </div>
-
-  <!-- 오늘 On-call -->
-  <div class="stat-card teal">
-    <div class="num">{{ oncall_today|length }}</div>
-    <div class="lbl">📱 오늘 On-call</div>
-    <div class="kpi-tooltip">
-      <div class="tt-title">📱 오늘 On-call ({{ oncall_today|length }}건)</div>
-      {% if oncall_today %}
-      <table>{% for r in oncall_today %}<tr>
-        <td><span class="badge badge-info">{{ r.modality }}</span></td>
-        <td style="font-weight:600">{{ r.staff_name }}</td>
-        <td style="color:#888">{% if r.start_time %}{{ r.start_time }}~{{ r.end_time }}{% else %}-{% endif %}</td>
-      </tr>{% endfor %}</table>
-      {% else %}<div class="empty-msg">없음</div>{% endif %}
-    </div>
-  </div>
-
+<!-- D-day / D-1 탭 -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('today')">
+    📅 D-day <span class="date-badge">{{ today }}</span>
+  </button>
+  <button class="tab-btn" onclick="switchTab('d1')">
+    📅 D-1 <span class="date-badge">{{ d1 }}</span>
+  </button>
 </div>
 
-<!-- ── ① 근무자현황 / ② 휴가현황 ── -->
-<div class="dash-2col">
-  <div class="card">
-    <div class="card-title">👥 근무자 현황 ({{ today }})</div>
-    {% if roster_today %}
-    <table>
-      <thead><tr><th>근무조</th><th>성명</th><th>직종</th><th>비고</th></tr></thead>
-      <tbody>{% for r in roster_today %}<tr>
-        <td><span class="shift-badge shift-{{ r.shift }}">{{ r.shift }}</span></td>
-        <td><strong>{{ r.staff_name }}</strong></td>
-        <td>{{ r.role or '-' }}</td>
-        <td>{{ r.note or '-' }}</td>
-      </tr>{% endfor %}</tbody>
-    </table>
-    {% else %}<p class="text-muted" style="padding:10px 0">등록된 근무자가 없습니다.</p>{% endif %}
-    <div class="mt-2"><a href="{{ url_for('write', date=today) }}" class="btn btn-sm btn-primary">+ 등록</a></div>
+<!-- ─── D-day (오늘) 탭 ─── -->
+<div class="tab-panel active" id="panel-today">
+  <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
+    <a href="/write?date={{ today }}" class="btn btn-primary btn-sm">✏️ 오늘 업무일지 작성</a>
   </div>
 
-  <div class="card">
-    <div class="card-title">🌴 휴가 현황 ({{ today }})</div>
-    {% if vacation_today %}
-    <table>
-      <thead><tr><th>성명</th><th>구분</th><th>날짜</th></tr></thead>
-      <tbody>{% for r in vacation_today %}<tr>
-        <td><strong>{{ r.staff_name }}</strong></td>
-        <td><span class="badge badge-info">{{ r.vacation_type }}</span></td>
-        <td>{{ r.start_date }}</td>
-      </tr>{% endfor %}</tbody>
-    </table>
-    {% else %}<p class="text-muted" style="padding:10px 0">오늘 휴가자가 없습니다.</p>{% endif %}
-    <div class="mt-2"><a href="{{ url_for('write', date=today) }}" class="btn btn-sm btn-primary">+ 등록</a></div>
-  </div>
-</div>
-
-<!-- ── ③ On-call / ④ 연장근무 ── -->
-<div class="dash-2col">
-  <div class="card">
-    <div class="card-title">📱 On-call ({{ today }})</div>
-    {% if oncall_today %}
-    <table>
-      <thead><tr><th>모달리티</th><th>담당자</th><th>시간</th><th>내용</th></tr></thead>
-      <tbody>{% for r in oncall_today %}<tr>
-        <td><span class="badge badge-info">{{ r.modality }}</span></td>
-        <td><strong>{{ r.staff_name }}</strong></td>
-        <td>{% if r.start_time %}{{ r.start_time }}~{{ r.end_time }}{% else %}-{% endif %}</td>
-        <td>{{ r.note or '-' }}</td>
-      </tr>{% endfor %}</tbody>
-    </table>
-    {% else %}<p class="text-muted" style="padding:10px 0">등록된 On-call이 없습니다.</p>{% endif %}
-    <div class="mt-2"><a href="{{ url_for('write', date=today) }}" class="btn btn-sm btn-primary">+ 등록</a></div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">⏰ 연장근무 ({{ today }})</div>
-    {% if overtime_today %}
-    <table>
-      <thead><tr><th>성명</th><th>시작</th><th>종료</th><th>시간</th><th>사유</th></tr></thead>
-      <tbody>{% for r in overtime_today %}<tr>
-        <td><strong>{{ r.staff_name }}</strong></td>
-        <td>{{ r.start_time }}</td>
-        <td>{{ r.end_time }}</td>
-        <td>{{ r.hours }}h</td>
-        <td>{{ r.reason }}</td>
-      </tr>{% endfor %}</tbody>
-    </table>
-    {% else %}<p class="text-muted" style="padding:10px 0">등록된 연장근무가 없습니다.</p>{% endif %}
-    <div class="mt-2"><a href="{{ url_for('write', date=today) }}" class="btn btn-sm btn-primary">+ 등록</a></div>
-  </div>
-</div>
-
-<!-- ── ⑤ 장비 이력 ── -->
-<div class="card">
-  <div class="card-title">🔧 장비 이력 ({{ today }})</div>
-  {% if equipment_today %}
-  <table>
-    <thead><tr><th>장비</th><th>유형</th><th>내용</th><th>엔지니어</th><th>다운타임</th><th>상태</th></tr></thead>
-    <tbody>{% for r in equipment_today %}<tr>
-      <td><strong>{{ r.equipment }}</strong></td>
-      <td><span class="badge badge-warning">{{ r.log_type }}</span></td>
-      <td>{{ r.description }}</td>
-      <td>{{ r.engineer or '-' }}</td>
-      <td>{{ r.downtime_hours }}h</td>
-      <td><span class="badge {{ 'badge-success' if r.status=='완료' else 'badge-danger' }}">{{ r.status }}</span></td>
-    </tr>{% endfor %}</tbody>
-  </table>
-  {% else %}<p class="text-muted" style="padding:10px 0">등록된 장비 이력이 없습니다.</p>{% endif %}
-  <div class="mt-2"><a href="{{ url_for('write', date=today) }}" class="btn btn-sm btn-primary">+ 등록</a></div>
-</div>
-
-<!-- ── ⑥ 인수인계 / ⑦ 이슈 ── -->
-<div class="dash-2col">
-  <div class="card">
-    <div class="card-title">🔄 인수인계 ({{ today }})</div>
-    {% if handover_today %}
-    {% for r in handover_today %}
-    <div style="border-left:3px solid {{ '#ea4335' if r.priority=='긴급' else '#fbbc04' if r.priority=='중요' else '#ccc' }};padding:8px 12px;margin-bottom:8px;background:#fafafa;border-radius:0 4px 4px 0">
-      <div style="font-size:12px;color:#888">
-        {{ r.shift }} | {{ r.from_person }} → {{ r.to_person }}
-        <span class="badge {{ 'badge-danger' if r.priority=='긴급' else 'badge-warning' if r.priority=='중요' else 'badge-secondary' }}">{{ r.priority }}</span>
+  <div class="section-grid">
+    <!-- 근무자 현황 -->
+    <div class="dash-section">
+      <div class="dash-title">👥 근무자 현황</div>
+      <div class="dash-body">
+        {% if roster_grouped %}
+          {% for (shift, part), names in roster_grouped %}
+          <div class="roster-group">
+            <div class="group-label">{{ shift }} {{ part }}</div>
+            <div class="names">{{ names|join(', ') }}</div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty-msg">등록된 근무자가 없습니다.</div>
+        {% endif %}
       </div>
-      <div style="margin-top:4px;font-size:13px">{{ r.content[:80] }}{% if r.content|length>80 %}…{% endif %}</div>
     </div>
-    {% endfor %}
-    {% else %}<p class="text-muted" style="padding:10px 0">등록된 인수인계가 없습니다.</p>{% endif %}
-    <div class="mt-2"><a href="{{ url_for('write', date=today) }}" class="btn btn-sm btn-primary">+ 등록</a></div>
+
+    <!-- 휴가 현황 -->
+    <div class="dash-section">
+      <div class="dash-title">🏖️ 휴가 현황</div>
+      <div class="dash-body">
+        {% if vacation_today %}
+        <table>
+          <thead><tr><th>파트</th><th>휴가코드</th><th>성명</th></tr></thead>
+          <tbody>
+          {% for v in vacation_today %}
+          <tr><td>{{ v.part }}</td><td>{{ v.vacation_code }}</td><td>{{ v.staff_name }}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+          <div class="empty-msg">해당 없음</div>
+        {% endif %}
+      </div>
+    </div>
   </div>
 
-  <div class="card">
-    <div class="card-title">⚠️ 특이사항·이슈 ({{ today }})</div>
-    {% if issues_today %}
-    <table>
-      <thead><tr><th>구분</th><th>심각도</th><th>제목</th><th>상태</th></tr></thead>
-      <tbody>{% for r in issues_today %}<tr>
-        <td>{{ r.category }}</td>
-        <td><span class="badge {{ 'badge-danger' if r.severity=='긴급' else 'badge-warning' if r.severity=='중요' else 'badge-secondary' }}">{{ r.severity }}</span></td>
-        <td><strong>{{ r.title }}</strong></td>
-        <td><span class="badge {{ 'badge-danger' if r.status=='진행중' else 'badge-success' if r.status=='해결' else 'badge-secondary' }}">{{ r.status }}</span></td>
-      </tr>{% endfor %}</tbody>
-    </table>
-    {% else %}<p class="text-muted" style="padding:10px 0">등록된 이슈가 없습니다.</p>{% endif %}
-    <div class="mt-2"><a href="{{ url_for('write', date=today) }}" class="btn btn-sm btn-primary">+ 등록</a></div>
+  <div class="section-grid">
+    <!-- On-call 현황 -->
+    <div class="dash-section">
+      <div class="dash-title">📞 On-call 현황</div>
+      <div class="dash-body">
+        {% if oncall_today %}
+        <table>
+          <thead><tr><th>파트</th><th>성명</th><th>병원도착</th><th>시술시작</th><th>시술종료</th><th>퇴실</th><th>총시간</th><th>사유</th></tr></thead>
+          <tbody>
+          {% for o in oncall_today %}
+          <tr><td>{{ o.part }}</td><td>{{ o.staff_name }}</td><td>{{ o.arrival_time or o.start_time }}</td><td>{{ o.procedure_start }}</td><td>{{ o.procedure_end }}</td><td>{{ o.departure_time or o.end_time }}</td><td>{{ format_hh_mm(o.hours) if o.hours else '' }}</td><td>{{ o.reason }}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+          <div class="empty-msg">해당 없음</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- 연장근무 현황 -->
+    <div class="dash-section">
+      <div class="dash-title">⏰ 연장근무 현황</div>
+      <div class="dash-body">
+        {% if overtime_today %}
+        <table>
+          <thead><tr><th>파트</th><th>성명</th><th>시작</th><th>종료</th><th>총시간</th><th>사유</th></tr></thead>
+          <tbody>
+          {% for ot in overtime_today %}
+          <tr><td>{{ ot.part }}</td><td>{{ ot.staff_name }}</td><td>{{ ot.start_time }}</td><td>{{ ot.end_time }}</td><td>{{ format_hh_mm(ot.hours) if ot.hours else '' }}</td><td>{{ ot.reason }}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+          <div class="empty-msg">해당 없음</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- 장비 이력 -->
+  <div class="dash-section-full">
+    <div class="dash-title">🔧 장비 이력</div>
+    <div class="dash-body">
+      {% if equipment_today %}
+      <table>
+        <thead><tr><th>장비명</th><th>유형</th><th>내용</th><th>엔지니어</th><th>시작</th><th>종료</th><th>다운타임</th><th>상태</th></tr></thead>
+        <tbody>
+        {% for e in equipment_today %}
+        <tr>
+          <td>{{ e.equipment_name }}</td><td>{{ e.log_type }}</td><td>{{ e.description }}</td>
+          <td>{{ e.engineer }}</td><td>{{ e.start_time }}</td><td>{{ e.end_time }}</td><td>{{ e.downtime }}</td>
+          <td><span class="badge {{ 'badge-danger' if e.status=='처리중' else 'badge-success' }}">{{ e.status }}</span></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+        <div class="empty-msg">해당 없음</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- 특이사항·이슈 -->
+  <div class="dash-section-full">
+    <div class="dash-title">⚠️ 특이사항·이슈</div>
+    <div class="dash-body">
+      {% if issues_today %}
+      <table>
+        <thead><tr><th>구분</th><th>심각도</th><th>제목</th><th>내용</th><th>상태</th></tr></thead>
+        <tbody>
+        {% for iss in issues_today %}
+        <tr>
+          <td>{{ iss.category }}</td>
+          <td><span class="badge {{ 'badge-danger' if iss.severity=='긴급' else ('badge-warning' if iss.severity=='중요' else 'badge-secondary') }}">{{ iss.severity }}</span></td>
+          <td>{{ iss.title }}</td><td>{{ iss.content }}</td><td>{{ iss.status }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+        <div class="empty-msg">해당 없음</div>
+      {% endif %}
+    </div>
   </div>
 </div>
 
+<!-- ─── D-1 탭 ─── -->
+<div class="tab-panel" id="panel-d1">
+  <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
+    <a href="/write?date={{ d1 }}" class="btn btn-secondary btn-sm">✏️ D-1 업무일지 보기</a>
+  </div>
+
+  <div class="section-grid">
+    <!-- 근무자 현황 D-1 -->
+    <div class="dash-section">
+      <div class="dash-title">👥 근무자 현황</div>
+      <div class="dash-body">
+        {% if roster_grouped_d1 %}
+          {% for (shift, part), names in roster_grouped_d1 %}
+          <div class="roster-group">
+            <div class="group-label">{{ shift }} {{ part }}</div>
+            <div class="names">{{ names|join(', ') }}</div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty-msg">등록된 근무자가 없습니다.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- 휴가 현황 D-1 -->
+    <div class="dash-section">
+      <div class="dash-title">🏖️ 휴가 현황</div>
+      <div class="dash-body">
+        {% if vacation_d1 %}
+        <table>
+          <thead><tr><th>파트</th><th>휴가코드</th><th>성명</th></tr></thead>
+          <tbody>
+          {% for v in vacation_d1 %}
+          <tr><td>{{ v.part }}</td><td>{{ v.vacation_code }}</td><td>{{ v.staff_name }}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+          <div class="empty-msg">해당 없음</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="section-grid">
+    <!-- On-call D-1 -->
+    <div class="dash-section">
+      <div class="dash-title">📞 On-call 현황</div>
+      <div class="dash-body">
+        {% if oncall_d1 %}
+        <table>
+          <thead><tr><th>파트</th><th>성명</th><th>병원도착</th><th>시술시작</th><th>시술종료</th><th>퇴실</th><th>총시간</th><th>사유</th></tr></thead>
+          <tbody>
+          {% for o in oncall_d1 %}
+          <tr><td>{{ o.part }}</td><td>{{ o.staff_name }}</td><td>{{ o.arrival_time or o.start_time }}</td><td>{{ o.procedure_start }}</td><td>{{ o.procedure_end }}</td><td>{{ o.departure_time or o.end_time }}</td><td>{{ format_hh_mm(o.hours) if o.hours else '' }}</td><td>{{ o.reason }}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+          <div class="empty-msg">해당 없음</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- 연장근무 D-1 -->
+    <div class="dash-section">
+      <div class="dash-title">⏰ 연장근무 현황</div>
+      <div class="dash-body">
+        {% if overtime_d1 %}
+        <table>
+          <thead><tr><th>파트</th><th>성명</th><th>시작</th><th>종료</th><th>총시간</th><th>사유</th></tr></thead>
+          <tbody>
+          {% for ot in overtime_d1 %}
+          <tr><td>{{ ot.part }}</td><td>{{ ot.staff_name }}</td><td>{{ ot.start_time }}</td><td>{{ ot.end_time }}</td><td>{{ format_hh_mm(ot.hours) if ot.hours else '' }}</td><td>{{ ot.reason }}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+          <div class="empty-msg">해당 없음</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- 장비 이력 D-1 -->
+  <div class="dash-section-full">
+    <div class="dash-title">🔧 장비 이력</div>
+    <div class="dash-body">
+      {% if equipment_d1 %}
+      <table>
+        <thead><tr><th>장비명</th><th>유형</th><th>내용</th><th>엔지니어</th><th>시작</th><th>종료</th><th>다운타임</th><th>상태</th></tr></thead>
+        <tbody>
+        {% for e in equipment_d1 %}
+        <tr>
+          <td>{{ e.equipment_name }}</td><td>{{ e.log_type }}</td><td>{{ e.description }}</td>
+          <td>{{ e.engineer }}</td><td>{{ e.start_time }}</td><td>{{ e.end_time }}</td><td>{{ e.downtime }}</td>
+          <td><span class="badge {{ 'badge-danger' if e.status=='처리중' else 'badge-success' }}">{{ e.status }}</span></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+        <div class="empty-msg">해당 없음</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- 특이사항·이슈 D-1 -->
+  <div class="dash-section-full">
+    <div class="dash-title">⚠️ 특이사항·이슈</div>
+    <div class="dash-body">
+      {% if issues_d1 %}
+      <table>
+        <thead><tr><th>구분</th><th>심각도</th><th>제목</th><th>내용</th><th>상태</th></tr></thead>
+        <tbody>
+        {% for iss in issues_d1 %}
+        <tr>
+          <td>{{ iss.category }}</td>
+          <td><span class="badge {{ 'badge-danger' if iss.severity=='긴급' else ('badge-warning' if iss.severity=='중요' else 'badge-secondary') }}">{{ iss.severity }}</span></td>
+          <td>{{ iss.title }}</td><td>{{ iss.content }}</td><td>{{ iss.status }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+        <div class="empty-msg">해당 없음</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+  document.getElementById('panel-' + tab).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+</script>
 {% endblock %}

@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block page_title %}진단용방사선발생장치현황{% endblock %}
+{% block content %}
+<style>
+.eq-table th{background:#f0f4ff;font-size:12px;padding:7px 8px;white-space:nowrap}
+.eq-table td{padding:7px 8px;vertical-align:middle;font-size:12px}
+.eq-toolbar{display:flex;justify-content:flex-end;margin-bottom:10px}
+.btn-group{display:flex;gap:4px;flex-wrap:wrap}
+
+/* ── 모달 ── */
+.eq-modal-bg{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:600;align-items:center;justify-content:center;overflow-y:auto}
+.eq-modal-bg.open{display:flex}
+.eq-modal{background:#fff;border-radius:10px;padding:28px;width:560px;max-width:96vw;box-shadow:0 6px 32px rgba(0,0,0,.2);max-height:90vh;overflow-y:auto}
+.eq-modal h3{font-size:15px;margin-bottom:18px;color:#222}
+.eq-modal .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.eq-modal .form-row.full{grid-template-columns:1fr}
+.eq-modal label{font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px}
+.eq-modal input,.eq-modal textarea{width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:5px;font-size:13px;box-sizing:border-box}
+.eq-modal .modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+</style>
+
+<div class="eq-toolbar">
+  <button class="btn btn-primary btn-sm" onclick="openRdModal()">+ 신규 추가</button>
+</div>
+<div class="table-wrap" style="overflow-x:auto">
+  <table class="eq-table">
+    <thead>
+      <tr>
+        <th>No</th>
+        <th>코드</th>
+        <th>위치</th>
+        <th>용도</th>
+        <th>형식</th>
+        <th>모델명</th>
+        <th>제조일</th>
+        <th>제조번호</th>
+        <th>제조국</th>
+        <th>제조사</th>
+        <th>최초사용신고일</th>
+        <th>비고</th>
+        <th>관리</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for rd in radiation_devs %}
+    <tr>
+      <td style="color:#aaa">{{ loop.index }}</td>
+      <td style="font-weight:600;color:#1a73e8">{{ rd.code }}</td>
+      <td>{{ rd.location }}</td>
+      <td>{{ rd.purpose }}</td>
+      <td style="font-size:11px">{{ rd.device_type }}</td>
+      <td style="font-weight:600">{{ rd.model_name }}</td>
+      <td style="font-size:11px">{{ rd.manufacture_date }}</td>
+      <td style="font-size:11px">{{ rd.serial_number }}</td>
+      <td>{{ rd.manufacture_country }}</td>
+      <td>{{ rd.manufacturer }}</td>
+      <td style="font-size:11px">{{ rd.first_use_date }}</td>
+      <td style="color:#666;font-size:11px">{{ rd.note }}</td>
+      <td>
+        <div class="btn-group">
+          <button class="btn btn-sm btn-warning"
+            onclick="openRdEditModal({{ rd.id }},
+              '{{ rd.code|e }}','{{ rd.location|e }}','{{ rd.purpose|e }}',
+              '{{ rd.device_type|e }}','{{ rd.model_name|e }}','{{ rd.manufacture_date|e }}',
+              '{{ rd.serial_number|e }}','{{ rd.manufacture_country|e }}',
+              '{{ rd.manufacturer|e }}','{{ rd.first_use_date|e }}','{{ rd.note|e }}')">수정</button>
+          <form method="post" action="/radiation-device/delete/{{ rd.id }}" style="display:inline"
+                onsubmit="return confirm('삭제하시겠습니까?')">
+            <button class="btn btn-sm btn-danger">삭제</button>
+          </form>
+        </div>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="13" style="text-align:center;color:#aaa;padding:24px">등록된 장치가 없습니다.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- 추가/수정 모달 -->
+<div class="eq-modal-bg" id="rdModal">
+  <div class="eq-modal">
+    <h3 id="rdModalTitle">진단용방사선발생장치 신규 추가</h3>
+    <form method="post" id="rdForm" action="/radiation-device/add">
+      <div class="form-row">
+        <div>
+          <label>코드 (비고란의 허가번호)</label>
+          <input type="text" name="code" id="rd_code" placeholder="예) 2021-3190033-04-33-00002">
+        </div>
+        <div>
+          <label>위치</label>
+          <input type="text" name="location" id="rd_location" placeholder="예) 영상의학과">
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label>용도</label>
+          <input type="text" name="purpose" id="rd_purpose" placeholder="예) 일반촬영, C-arm">
+        </div>
+        <div>
+          <label>형식</label>
+          <input type="text" name="device_type" id="rd_device_type" placeholder="예) R-1000-150">
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label>모델명</label>
+          <input type="text" name="model_name" id="rd_model_name" placeholder="모델명">
+        </div>
+        <div>
+          <label>제조일</label>
+          <input type="text" name="manufacture_date" id="rd_manufacture_date" placeholder="예) 2022.03.30">
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label>제조번호</label>
+          <input type="text" name="serial_number" id="rd_serial_number" placeholder="제조번호">
+        </div>
+        <div>
+          <label>제조국</label>
+          <input type="text" name="manufacture_country" id="rd_manufacture_country" placeholder="예) 대한민국, 독일">
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label>제조사</label>
+          <input type="text" name="manufacturer" id="rd_manufacturer" placeholder="예) SIEMENS, GE">
+        </div>
+        <div>
+          <label>최초사용신고일</label>
+          <input type="text" name="first_use_date" id="rd_first_use_date" placeholder="예) 2022-04-15">
+        </div>
+      </div>
+      <div class="form-row full">
+        <div>
+          <label>비고</label>
+          <input type="text" name="note" id="rd_note" placeholder="비고 (특수의료장비 해당 여부 등)">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeRdModal()">취소</button>
+        <button type="submit" class="btn btn-primary" id="rdSaveBtn">저장</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openRdModal() {
+  document.getElementById('rdModalTitle').textContent = '진단용방사선발생장치 신규 추가';
+  document.getElementById('rdForm').action = '/radiation-device/add';
+  document.getElementById('rdSaveBtn').textContent = '저장';
+  ['code','location','purpose','device_type','model_name','manufacture_date','serial_number','manufacture_country','manufacturer','first_use_date','note'].forEach(function(f) {
+    document.getElementById('rd_' + f).value = '';
+  });
+  document.getElementById('rdModal').classList.add('open');
+}
+
+function openRdEditModal(id, code, location, purpose, device_type, model_name, manufacture_date, serial_number, manufacture_country, manufacturer, first_use_date, note) {
+  document.getElementById('rdModalTitle').textContent = '진단용방사선발생장치 수정';
+  document.getElementById('rdForm').action = '/radiation-device/edit/' + id;
+  document.getElementById('rdSaveBtn').textContent = '저장';
+  document.getElementById('rd_code').value = code;
+  document.getElementById('rd_location').value = location;
+  document.getElementById('rd_purpose').value = purpose;
+  document.getElementById('rd_device_type').value = device_type;
+  document.getElementById('rd_model_name').value = model_name;
+  document.getElementById('rd_manufacture_date').value = manufacture_date;
+  document.getElementById('rd_serial_number').value = serial_number;
+  document.getElementById('rd_manufacture_country').value = manufacture_country;
+  document.getElementById('rd_manufacturer').value = manufacturer;
+  document.getElementById('rd_first_use_date').value = first_use_date;
+  document.getElementById('rd_note').value = note;
+  document.getElementById('rdModal').classList.add('open');
+}
+
+function closeRdModal() {
+  document.getElementById('rdModal').classList.remove('open');
+}
+
+document.getElementById('rdModal').addEventListener('click', function(e) {
+  if (e.target === this) closeRdModal();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>업무일지 PDF</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'맑은 고딕','Malgun Gothic',sans-serif;font-size:11pt;background:#fff;color:#000}
+@page{size:A4;margin:15mm 12mm}
+@media print{
+  .no-print{display:none!important}
+  .page-break{page-break-after:always}
+}
+
+.no-print{padding:10px 16px;border-bottom:1px solid #e0e0e0;display:flex;align-items:center;gap:10px;background:#f8f9fa;margin-bottom:0}
+.no-print button{padding:6px 14px;border:none;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit;font-weight:600}
+.no-print .btn-print{background:#1a73e8;color:#fff}
+.no-print .btn-close{background:#6c757d;color:#fff}
+.no-print .info{font-size:12px;color:#555;margin-left:auto}
+
+.entry{padding:15mm 12mm}
+h1{font-size:16pt;text-align:center;margin-bottom:6px}
+.meta{text-align:center;font-size:10pt;color:#555;margin-bottom:12px}
+.approval{display:flex;justify-content:flex-end;gap:0;margin-bottom:16px}
+.approval-box{border:1px solid #333;padding:4px 10px;text-align:center;width:80px}
+.approval-box .role{font-size:9pt;border-bottom:1px solid #333;margin-bottom:20px;padding-bottom:2px}
+section{margin-bottom:14px}
+section h2{font-size:11pt;font-weight:700;background:#1a73e8;color:#fff;padding:4px 8px;margin-bottom:0}
+table{width:100%;border-collapse:collapse;font-size:10pt}
+th{background:#dce8ff;padding:4px 6px;border:1px solid #aaa;font-weight:600;text-align:center}
+td{padding:4px 6px;border:1px solid #ccc;vertical-align:middle}
+.empty{color:#aaa;font-size:10pt;padding:6px;text-align:center;border:1px solid #ccc}
+footer{margin-top:16px;text-align:center;font-size:9pt;color:#888;border-top:1px solid #ccc;padding-top:8px}
+.page-break{page-break-after:always}
+</style>
+</head>
+<body>
+
+<!-- 화면 전용 컨트롤 -->
+<div class="no-print">
+  <button class="btn-print" onclick="window.print()">🖨️ PDF 저장 / 인쇄</button>
+  <button class="btn-close" onclick="window.close()">✕ 닫기</button>
+  <span class="info">{{ entries|length }}개 날짜 · {{ now }} 출력</span>
+</div>
+
+{% for entry in entries %}
+<div class="entry {% if not loop.last %}page-break{% endif %}">
+
+  <h1>영상의학과 업무일지</h1>
+  <div class="meta">일자 : {{ entry.date }}</div>
+
+  <div class="approval">
+    <div class="approval-box"><div class="role">파트장</div></div>
+    <div class="approval-box"><div class="role">팀장</div></div>
+    <div class="approval-box"><div class="role">진료과장</div></div>
+  </div>
+
+  <!-- 근무자 현황 -->
+  <section>
+    <h2>근무자 현황</h2>
+    {% if entry.roster_grouped %}
+    <table>
+      <thead><tr><th style="width:60px">근무조</th><th style="width:70px">파트</th><th>성명</th></tr></thead>
+      <tbody>
+      {% for (shift, part), names in entry.roster_grouped %}
+      <tr>
+        <td style="text-align:center">{{ shift }}</td>
+        <td style="text-align:center">{{ part }}</td>
+        <td>{{ names|join(', ') }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">해당 없음</div>
+    {% endif %}
+  </section>
+
+  <!-- 휴가 현황 -->
+  <section>
+    <h2>휴가 현황</h2>
+    {% if entry.vacation %}
+    <table>
+      <thead><tr><th>파트</th><th>휴가코드</th><th>성명</th></tr></thead>
+      <tbody>
+      {% for v in entry.vacation %}
+      <tr><td>{{ v.part }}</td><td>{{ v.vacation_code }}</td><td>{{ v.staff_name }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">해당 없음</div>
+    {% endif %}
+  </section>
+
+  <!-- On-call -->
+  <section>
+    <h2>On-call</h2>
+    {% if entry.oncall %}
+    <table>
+      <thead><tr><th>파트</th><th>성명</th><th>전화받은 시각</th><th>사유</th></tr></thead>
+      <tbody>
+      {% for o in entry.oncall %}
+      <tr><td>{{ o.part }}</td><td>{{ o.staff_name }}</td><td>{{ o.received_time }}</td><td>{{ o.reason }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">해당 없음</div>
+    {% endif %}
+  </section>
+
+  <!-- 연장근무 -->
+  <section>
+    <h2>연장근무</h2>
+    {% if entry.overtime %}
+    <table>
+      <thead><tr><th>파트</th><th>성명</th><th>시작</th><th>종료</th><th>총시간</th><th>사유</th></tr></thead>
+      <tbody>
+      {% for ot in entry.overtime %}
+      <tr><td>{{ ot.part }}</td><td>{{ ot.staff_name }}</td><td>{{ ot.start_time }}</td><td>{{ ot.end_time }}</td><td>{{ format_hh_mm(ot.hours) if ot.hours else '' }}</td><td>{{ ot.reason }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">해당 없음</div>
+    {% endif %}
+  </section>
+
+  <!-- 장비 이력 -->
+  <section>
+    <h2>장비 이력</h2>
+    {% if entry.equipment %}
+    <table>
+      <thead><tr><th>장비명</th><th>유형</th><th>내용</th><th>엔지니어</th><th>시작</th><th>종료</th><th>다운타임</th><th>상태</th></tr></thead>
+      <tbody>
+      {% for e in entry.equipment %}
+      <tr>
+        <td>{{ e.equipment_name }}</td><td>{{ e.log_type }}</td><td>{{ e.description }}</td>
+        <td>{{ e.engineer }}</td><td>{{ e.start_time }}</td><td>{{ e.end_time }}</td>
+        <td>{{ e.downtime }}</td><td>{{ e.status }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">해당 없음</div>
+    {% endif %}
+  </section>
+
+  <!-- 특이사항·이슈 -->
+  <section>
+    <h2>특이사항·이슈</h2>
+    {% if entry.issues %}
+    <table>
+      <thead><tr><th>구분</th><th>심각도</th><th>제목</th><th>내용</th><th>상태</th></tr></thead>
+      <tbody>
+      {% for iss in entry.issues %}
+      <tr>
+        <td>{{ iss.category }}</td><td>{{ iss.severity }}</td>
+        <td>{{ iss.title }}</td><td>{{ iss.content }}</td><td>{{ iss.status }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">해당 없음</div>
+    {% endif %}
+  </section>
+
+  <!-- 야간 체크리스트 -->
+  <section>
+    <h2>야간 체크리스트</h2>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:36px">구분</th>
+          <th style="text-align:left">확인항목</th>
+          <th style="width:70px">문잠금상태</th>
+          <th style="width:80px">형광등 소등상태</th>
+          <th style="width:90px">냉·난방기구 ON-OFF</th>
+          <th style="text-align:left">비고</th>
+          <th style="text-align:left">확인결과</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for item in entry.night_checklist_items %}
+      <tr>
+        <td style="text-align:center">{{ item.no }}</td>
+        <td>{{ item.name }}</td>
+        <td style="text-align:center;font-weight:700;color:{{ '#2e7d32' if item.door_lock=='O' else ('#c62828' if item.door_lock=='X' else '#aaa') }}">{{ item.door_lock or '-' }}</td>
+        <td style="text-align:center;font-weight:700;color:{{ '#2e7d32' if item.light_off=='O' else ('#c62828' if item.light_off=='X' else '#aaa') }}">{{ item.light_off or '-' }}</td>
+        <td style="text-align:center;font-weight:700;color:{{ '#2e7d32' if item.hvac=='O' else ('#c62828' if item.hvac=='X' else '#aaa') }}">{{ item.hvac or '-' }}</td>
+        <td>{{ item.remark }}</td>
+        <td>{{ item.check_result }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <footer>중앙대학교병원 영상의학과</footer>
+</div>
+{% endfor %}
+
+<script>
+window.addEventListener('load', function() {
+  window.print();
+});
+</script>
+</body>
+</html>

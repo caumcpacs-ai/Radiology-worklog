@@ -1,50 +1,26 @@
-{% extends 'base.html' %}
-{% block page_title %}{{ '✏️ 휴가 수정' if row else '➕ 휴가 등록' }}{% endblock %}
+{% extends "base.html" %}
+{% block page_title %}{{ '휴가 수정' if row else '휴가 등록' }}{% endblock %}
 {% block content %}
 <div class="form-container">
   <div class="form-title">{{ '휴가 수정' if row else '휴가 등록' }}</div>
   <form method="POST">
     <div class="grid-2">
       <div class="form-group">
-        <label>직원명</label>
+        <label>날짜</label>
+        <input type="date" name="date" value="{{ row.date if row else today }}" required>
+      </div>
+      <div class="form-group">
+        <label>성명</label>
         <input type="text" name="staff_name" value="{{ row.staff_name if row else '' }}" placeholder="홍길동" required>
       </div>
       <div class="form-group">
-        <label>휴가 구분</label>
-        <select name="vacation_type" required>
-          {% for v in ['연차','반차(오전)','반차(오후)','병가','공가','특별휴가','기타'] %}
-          <option value="{{ v }}" {{ 'selected' if row and row.vacation_type==v }}>{{ v }}</option>
-          {% endfor %}
-        </select>
+        <label>휴가 코드</label>
+        <input type="text" name="vacation_code" value="{{ row.vacation_code if row else '' }}" placeholder="코드 입력" required>
       </div>
-      <div class="form-group">
-        <label>시작일</label>
-        <input type="date" name="start_date" value="{{ row.start_date if row else today }}" required>
-      </div>
-      <div class="form-group">
-        <label>종료일</label>
-        <input type="date" name="end_date" value="{{ row.end_date if row else today }}" required>
-      </div>
-      <div class="form-group">
-        <label>일수</label>
-        <input type="number" name="days" value="{{ row.days if row else 1 }}" min="0.5" step="0.5" required>
-      </div>
-      <div class="form-group">
-        <label>승인 상태</label>
-        <select name="status">
-          {% for v in ['대기','승인','반려'] %}
-          <option value="{{ v }}" {{ 'selected' if row and row.status==v }}>{{ v }}</option>
-          {% endfor %}
-        </select>
-      </div>
-    </div>
-    <div class="form-group">
-      <label>사유 (선택)</label>
-      <input type="text" name="reason" value="{{ row.reason if row else '' }}" placeholder="개인사정, 병원방문 등">
     </div>
     <div class="flex gap-1 mt-2">
       <button type="submit" class="btn btn-primary">{{ '수정 완료' if row else '등록' }}</button>
-      <a href="{{ url_for('vacation') }}" class="btn btn-secondary">취소</a>
+      <a href="{{ url_for('write') }}" class="btn btn-secondary">취소</a>
     </div>
   </form>
 </div>

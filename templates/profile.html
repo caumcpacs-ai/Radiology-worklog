@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block page_title %}개인정보 수정{% endblock %}
+{% block content %}
+<div style="max-width:520px">
+
+  <div class="card">
+    <div class="card-title">👤 내 정보</div>
+    <table style="margin-bottom:0">
+      <tr><th style="width:110px">사번</th><td>{{ user.username }}</td></tr>
+      <tr><th>파트</th><td>{{ user.part or '-' }}</td></tr>
+      <tr><th>권한</th><td>{{ '관리자' if user.role == 'admin' else '사용자' }}</td></tr>
+      <tr><th>입사일</th><td>{{ user.hire_date or '-' }}</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title">✏️ 정보 수정</div>
+    <form method="post" action="{{ url_for('profile_save') }}">
+      <div class="form-group">
+        <label>이름</label>
+        <input type="text" name="name" value="{{ user.name }}" required>
+      </div>
+      <div class="form-group">
+        <label>파트</label>
+        <select name="part">
+          <option value="">-- 선택 --</option>
+          {% for p in parts %}<option value="{{ p }}" {{ 'selected' if user.part == p }}>{{ p }}</option>{% endfor %}
+        </select>
+      </div>
+      <hr style="border:none;border-top:1px solid #e0e0e0;margin:16px 0">
+      <div style="font-size:13px;font-weight:600;color:#555;margin-bottom:12px">비밀번호 변경 (변경 시에만 입력)</div>
+      <div class="form-group">
+        <label>현재 비밀번호</label>
+        <input type="password" name="current_password" autocomplete="current-password">
+      </div>
+      <div class="form-group">
+        <label>새 비밀번호</label>
+        <input type="password" name="new_password" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label>새 비밀번호 확인</label>
+        <input type="password" name="confirm_password" autocomplete="new-password">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn btn-primary" type="submit">저장</button>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">취소</a>
+      </div>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

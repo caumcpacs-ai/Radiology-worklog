@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% block page_title %}On-call 리스트{% endblock %}
+{% block content %}
+
+<div class="card" style="margin-bottom:16px">
+  <form method="get" action="{{ url_for('oncall_list') }}" class="flex flex-wrap align-center gap-1" style="gap:12px">
+    <div class="flex align-center" style="gap:6px">
+      <label style="margin:0;white-space:nowrap;font-weight:600">기간</label>
+      <input type="date" name="date_from" value="{{ date_from }}" style="width:140px">
+      <span style="color:#888">~</span>
+      <input type="date" name="date_to" value="{{ date_to }}" style="width:140px">
+    </div>
+    <div class="flex align-center" style="gap:6px">
+      <label style="margin:0;white-space:nowrap;font-weight:600">이름</label>
+      <select name="staff_name" style="width:140px">
+        <option value="">전체</option>
+        {% for n in names %}
+          <option value="{{ n }}" {% if staff_name == n %}selected{% endif %}>{{ n }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary">조회</button>
+    <a href="{{ url_for('oncall_list') }}" class="btn btn-secondary">초기화</a>
+    {% if rows %}
+    <button type="button" class="btn btn-success" style="background-color:#2e7d32;color:#fff;border-color:#2e7d32" onclick="exportExcel()">엑셀 다운로드</button>
+    {% endif %}
+  </form>
+</div>
+
+<div class="table-wrap">
+  <div class="table-header">
+    <h2>On-call 현황
+      <span class="badge badge-info" style="margin-left:8px;font-size:13px">{{ rows|length }}건</span>
+    </h2>
+    {% if date_from or date_to or staff_name %}
+    <span class="text-muted">
+      {% if date_from %}{{ date_from }}{% endif %}
+      {% if date_from or date_to %} ~ {% endif %}
+      {% if date_to %}{{ date_to }}{% endif %}
+      {% if staff_name %} / {{ staff_name }}{% endif %}
+    </span>
+    {% endif %}
+  </div>
+  {% if rows %}
+  <table id="oncall-table">
+    <thead>
+      <tr>
+        <th style="width:110px">날짜</th>
+        <th style="width:70px">파트</th>
+        <th style="width:90px">성명</th>
+        <th style="width:85px">병원도착</th>
+        <th style="width:85px">시술시작</th>
+        <th style="width:85px">시술종료</th>
+        <th style="width:85px">퇴실</th>
+        <th style="width:70px">총시간</th>
+        <th>사유</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr {% if not loop.first and rows[loop.index0-1]['date'] != r['date'] %}style="border-top:2px solid #c0d4f0"{% endif %}>
+        <td>
+          {% if loop.first or rows[loop.index0-1]['date'] != r['date'] %}
+            <strong>{{ r['date'] }}</strong>
+          {% endif %}
+        </td>
+        <td>{{ r['part'] or '' }}</td>
+        <td>{{ r['staff_name'] }}</td>
+        <td>{{ r['arrival_time'] or r['start_time'] or '' }}</td>
+        <td>{{ r['procedure_start'] or '' }}</td>
+        <td>{{ r['procedure_end'] or '' }}</td>
+        <td>{{ r['departure_time'] or r['end_time'] or '' }}</td>
+        <td>{{ format_hh_mm(r['hours']) if r['hours'] else '' }}</td>
+        <td style="white-space:pre-wrap">{{ r['reason'] or '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="padding:40px;text-align:center;color:#888">
+    조건에 맞는 On-call 기록이 없습니다.
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function exportExcel() {
+  var table = document.getElementById("oncall-table");
+  if (!table) return;
+  var csv = [];
+  var rows = table.querySelectorAll("tr");
+  var lastDate = "";
+  
+  for (var i = 0; i < rows.length; i++) {
+    var row = [];
+    var cols = rows[i].querySelectorAll("td, th");
+    
+    for (var j = 0; j < cols.length; j++) {
+      var data = cols[j].innerText.trim();
+      // 데이터 행이고 첫 번째 컬럼(날짜)이 비어있으면 이전 날짜로 보정
+      if (i > 0 && j === 0) {
+        if (data === "") {
+          data = lastDate;
+        } else {
+          lastDate = data;
+        }
+      }
+      data = data.replace(/"/g, '""');
+      row.push('"' + data + '"');
+    }
+    csv.push(row.join(","));
+  }
+  
+  var csvString = "\ufeff" + csv.join("\n");
+  var blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
+  var link = document.createElement("a");
+  var url = URL.createObjectURL(blob);
+  
+  // 날짜 범위를 파일명에 접미사로 추가
+  var dateStr = "";
+  var dateFrom = document.querySelector('input[name="date_from"]').value;
+  var dateTo = document.querySelector('input[name="date_to"]').value;
+  if (dateFrom || dateTo) {
+    dateStr = "_" + (dateFrom || "") + "~" + (dateTo || "");
+  } else {
+    var today = new Date();
+    var yyyy = today.getFullYear();
+    var mm = String(today.getMonth() + 1).padStart(2, '0');
+    var dd = String(today.getDate()).padStart(2, '0');
+    dateStr = "_" + yyyy + mm + dd;
+  }
+  
+  link.setAttribute("href", url);
+  link.setAttribute("download", "On-call_현황" + dateStr + ".csv");
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+</script>
+{% endblock %}
