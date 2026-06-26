@@ -347,9 +347,13 @@ tbody tr:nth-child(even) td { background: #fafafa; }
     <table>
       <thead>
         <tr>
-          <th style="width:70px">파트</th>
-          <th style="width:70px">성명</th>
-          <th style="width:90px">전화받은 시각</th>
+          <th style="width:54px">파트</th>
+          <th style="width:54px">성명</th>
+          <th style="width:52px">병원도착</th>
+          <th style="width:52px">시술시작</th>
+          <th style="width:52px">시술종료</th>
+          <th style="width:48px">퇴실</th>
+          <th style="width:52px">총시간</th>
           <th>사유</th>
         </tr>
       </thead>
@@ -358,7 +362,11 @@ tbody tr:nth-child(even) td { background: #fafafa; }
       <tr>
         <td class="text-center">{{ o.part }}</td>
         <td class="text-center">{{ o.staff_name }}</td>
-        <td class="text-center">{{ o.received_time }}</td>
+        <td class="text-center">{{ o.arrival_time or o.start_time or '' }}</td>
+        <td class="text-center">{{ o.procedure_start or '' }}</td>
+        <td class="text-center">{{ o.procedure_end or '' }}</td>
+        <td class="text-center">{{ o.departure_time or o.end_time or '' }}</td>
+        <td class="text-center">{{ format_hh_mm(o.hours) if o.hours else '' }}</td>
         <td>{{ o.reason }}</td>
       </tr>
       {% endfor %}
