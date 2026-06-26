@@ -4,202 +4,528 @@
 <meta charset="UTF-8">
 <title>업무일지 PDF</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'맑은 고딕','Malgun Gothic',sans-serif;font-size:11pt;background:#fff;color:#000}
-@page{size:A4;margin:15mm 12mm}
-@media print{
-  .no-print{display:none!important}
-  .page-break{page-break-after:always}
+/* ─── 기본 ─── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: '맑은 고딕', 'Malgun Gothic', 'Noto Sans KR', sans-serif;
+  font-size: 10.5pt;
+  background: #f0f2f5;
+  color: #1a1a1a;
 }
 
-.no-print{padding:10px 16px;border-bottom:1px solid #e0e0e0;display:flex;align-items:center;gap:10px;background:#f8f9fa;margin-bottom:0}
-.no-print button{padding:6px 14px;border:none;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit;font-weight:600}
-.no-print .btn-print{background:#1a73e8;color:#fff}
-.no-print .btn-close{background:#6c757d;color:#fff}
-.no-print .info{font-size:12px;color:#555;margin-left:auto}
+/* ─── 화면 전용 컨트롤 ─── */
+.preview-controls {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: #fff;
+  border-bottom: 1px solid #ddd;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.08);
+}
+.btn {
+  padding: 7px 18px;
+  border: none;
+  border-radius: 6px;
+  font-size: 10pt;
+  font-family: inherit;
+  cursor: pointer;
+  font-weight: 600;
+}
+.btn-primary  { background: #1a56db; color: #fff; }
+.btn-primary:hover  { background: #1344b4; }
+.btn-secondary { background: #e5e7eb; color: #374151; }
+.btn-secondary:hover { background: #d1d5db; }
+.preview-label { font-size: 9.5pt; color: #6b7280; margin-left: auto; }
 
-.entry{padding:15mm 12mm}
-h1{font-size:16pt;text-align:center;margin-bottom:6px}
-.meta{text-align:center;font-size:10pt;color:#555;margin-bottom:12px}
-.approval{display:flex;justify-content:flex-end;gap:0;margin-bottom:16px}
-.approval-box{border:1px solid #333;padding:4px 10px;text-align:center;width:80px}
-.approval-box .role{font-size:9pt;border-bottom:1px solid #333;margin-bottom:20px;padding-bottom:2px}
-section{margin-bottom:14px}
-section h2{font-size:11pt;font-weight:700;background:#1a73e8;color:#fff;padding:4px 8px;margin-bottom:0}
-table{width:100%;border-collapse:collapse;font-size:10pt}
-th{background:#dce8ff;padding:4px 6px;border:1px solid #aaa;font-weight:600;text-align:center}
-td{padding:4px 6px;border:1px solid #ccc;vertical-align:middle}
-.empty{color:#aaa;font-size:10pt;padding:6px;text-align:center;border:1px solid #ccc}
-footer{margin-top:16px;text-align:center;font-size:9pt;color:#888;border-top:1px solid #ccc;padding-top:8px}
-.page-break{page-break-after:always}
+/* ─── A4 용지 (날짜 단위) ─── */
+.entry {
+  background: #fff;
+  width: 210mm;
+  min-height: 297mm;
+  margin: 20px auto;
+  padding: 15mm 13mm 13mm;
+  box-shadow: 0 4px 20px rgba(0,0,0,.15);
+}
+
+/* ─── 헤더 ─── */
+.doc-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 2.5px solid #1a56db;
+}
+.doc-hospital {
+  font-size: 9pt;
+  color: #5a6b7a;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+.doc-title {
+  font-size: 20pt;
+  font-weight: 800;
+  color: #1a1a2e;
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+}
+.doc-date-badge {
+  display: inline-block;
+  font-size: 9pt;
+  color: #1a56db;
+  background: #eff4ff;
+  border: 1px solid #c7d8ff;
+  border-radius: 12px;
+  padding: 2px 10px;
+  margin-top: 5px;
+  font-weight: 600;
+}
+
+/* ─── 결재란 ─── */
+.approval-grid {
+  display: flex;
+  border: 1.5px solid #374151;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.approval-col {
+  width: 56px;
+  text-align: center;
+  border-right: 1px solid #374151;
+}
+.approval-col:last-child { border-right: none; }
+.approval-role {
+  font-size: 8pt;
+  font-weight: 700;
+  background: #f3f4f6;
+  color: #374151;
+  padding: 3px 0;
+  border-bottom: 1px solid #374151;
+}
+.approval-sign { height: 40px; }
+
+/* ─── 섹션 공통 ─── */
+.section { margin-bottom: 11px; }
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 4px;
+}
+.section-bar {
+  width: 4px;
+  height: 15px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  background: var(--c);
+}
+.section-title {
+  font-size: 10.5pt;
+  font-weight: 700;
+  color: var(--c);
+}
+.section-count {
+  font-size: 8pt;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 10px;
+  margin-left: auto;
+  background: var(--cl);
+  color: var(--c);
+  border: 1px solid var(--cb);
+}
+
+/* ─── 섹션별 색상 팔레트 ─── */
+.c-roster  { --c:#1a56db; --cl:#eff4ff; --cb:#c7d8ff; }
+.c-vacation{ --c:#0e9f6e; --cl:#ecfdf5; --cb:#a7f3d0; }
+.c-oncall  { --c:#d61f69; --cl:#fdf2f8; --cb:#fbcfe8; }
+.c-overtime{ --c:#e3a008; --cl:#fffbeb; --cb:#fde68a; }
+.c-equip   { --c:#7e3af2; --cl:#f5f3ff; --cb:#ddd6fe; }
+.c-issue   { --c:#e02424; --cl:#fff5f5; --cb:#fed7d7; }
+.c-check   { --c:#1c64f2; --cl:#ebf5fb; --cb:#bee3f8; }
+
+/* ─── 테이블 ─── */
+table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+th {
+  padding: 4px 5px;
+  border: 1px solid #d1d5db;
+  font-weight: 700;
+  text-align: center;
+  background: var(--cl, #f9fafb);
+  color: var(--c, #374151);
+  white-space: nowrap;
+  font-size: 9pt;
+}
+td {
+  padding: 4px 5px;
+  border: 1px solid #e5e7eb;
+  vertical-align: middle;
+}
+tbody tr:nth-child(even) td { background: #fafafa; }
+.text-center { text-align: center; }
+
+/* ─── 데이터 없음 ─── */
+.empty-row td {
+  text-align: center;
+  color: #9ca3af;
+  font-size: 9pt;
+  padding: 7px;
+  background: #fafafa;
+}
+
+/* ─── 태그 (뱃지) ─── */
+.w-tag {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 8.5pt;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tag-night   { background: #1e3a5f; color: #fff; }
+.tag-morning { background: #e3a008; color: #fff; }
+.tag-full    { background: #0e9f6e; color: #fff; }
+.tag-done    { background: #d1fae5; color: #065f46; }
+.tag-ing     { background: #fef3c7; color: #92400e; }
+.tag-issue   { background: #fee2e2; color: #991b1b; }
+
+/* ─── 심각도 ─── */
+.sev-high { color: #dc2626; font-weight: 700; }
+.sev-mid  { color: #d97706; font-weight: 700; }
+.sev-low  { color: #059669; font-weight: 700; }
+
+/* ─── 체크리스트 ─── */
+.check-o  { color: #059669; font-weight: 800; font-size: 11pt; }
+.check-x  { color: #dc2626; font-weight: 800; font-size: 11pt; }
+.check-na { color: #9ca3af; font-size: 9.5pt; }
+
+/* ─── 푸터 ─── */
+.doc-footer {
+  margin-top: 14px;
+  padding-top: 7px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 8.5pt;
+  color: #9ca3af;
+}
+
+/* ─── 인쇄 ─── */
+@page { size: A4; margin: 0; }
+@media print {
+  body { background: #fff; }
+  .preview-controls { display: none !important; }
+  .entry {
+    box-shadow: none;
+    margin: 0;
+    padding: 13mm 12mm 11mm;
+    width: 100%;
+    min-height: auto;
+    page-break-after: always;
+  }
+  .entry:last-child { page-break-after: avoid; }
+  tbody tr:nth-child(even) td { background: #fafafa !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .tag-night, .tag-morning, .tag-full, .tag-done, .tag-ing, .tag-issue { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
 </style>
 </head>
 <body>
 
 <!-- 화면 전용 컨트롤 -->
-<div class="no-print">
-  <button class="btn-print" onclick="window.print()">🖨️ PDF 저장 / 인쇄</button>
-  <button class="btn-close" onclick="window.close()">✕ 닫기</button>
-  <span class="info">{{ entries|length }}개 날짜 · {{ now }} 출력</span>
+<div class="preview-controls">
+  <button class="btn btn-primary" onclick="window.print()">🖨️ PDF 저장 / 인쇄</button>
+  <button class="btn btn-secondary" onclick="window.close()">✕ 닫기</button>
+  <span class="preview-label">{{ entries|length }}개 날짜 · {{ now }} 출력</span>
 </div>
 
 {% for entry in entries %}
-<div class="entry {% if not loop.last %}page-break{% endif %}">
+<div class="entry">
 
-  <h1>영상의학과 업무일지</h1>
-  <div class="meta">일자 : {{ entry.date }}</div>
-
-  <div class="approval">
-    <div class="approval-box"><div class="role">파트장</div></div>
-    <div class="approval-box"><div class="role">팀장</div></div>
-    <div class="approval-box"><div class="role">진료과장</div></div>
+  <!-- 헤더 -->
+  <div class="doc-header">
+    <div>
+      <div class="doc-hospital">중앙대학교병원 · 영상의학과</div>
+      <div class="doc-title">업무일지</div>
+      <div class="doc-date-badge">{{ entry.date }}</div>
+    </div>
+    <div class="approval-grid">
+      <div class="approval-col">
+        <div class="approval-role">파트장</div>
+        <div class="approval-sign"></div>
+      </div>
+      <div class="approval-col">
+        <div class="approval-role">팀장</div>
+        <div class="approval-sign"></div>
+      </div>
+      <div class="approval-col">
+        <div class="approval-role">진료과장</div>
+        <div class="approval-sign"></div>
+      </div>
+    </div>
   </div>
 
-  <!-- 근무자 현황 -->
-  <section>
-    <h2>근무자 현황</h2>
+  <!-- ① 근무자 현황 -->
+  {% set ns = namespace(roster_total=0) %}
+  {% for (shift, part), names in entry.roster_grouped %}{% set ns.roster_total = ns.roster_total + names|length %}{% endfor %}
+  <div class="section c-roster">
+    <div class="section-head">
+      <div class="section-bar"></div>
+      <div class="section-title">근무자 현황</div>
+      {% if ns.roster_total > 0 %}<div class="section-count">{{ ns.roster_total }}명</div>{% endif %}
+    </div>
     {% if entry.roster_grouped %}
     <table>
-      <thead><tr><th style="width:60px">근무조</th><th style="width:70px">파트</th><th>성명</th></tr></thead>
+      <thead>
+        <tr>
+          <th style="width:56px">근무조</th>
+          <th style="width:62px">파트</th>
+          <th>성명</th>
+        </tr>
+      </thead>
       <tbody>
       {% for (shift, part), names in entry.roster_grouped %}
       <tr>
-        <td style="text-align:center">{{ shift }}</td>
-        <td style="text-align:center">{{ part }}</td>
+        <td class="text-center">
+          <span class="w-tag {% if shift == '야간' %}tag-night{% elif shift == '종일' %}tag-full{% else %}tag-morning{% endif %}">{{ shift }}</span>
+        </td>
+        <td class="text-center">{{ part }}</td>
         <td>{{ names|join(', ') }}</td>
       </tr>
       {% endfor %}
       </tbody>
     </table>
     {% else %}
-    <div class="empty">해당 없음</div>
+    <table><tbody><tr class="empty-row"><td>해당 없음</td></tr></tbody></table>
     {% endif %}
-  </section>
+  </div>
 
-  <!-- 휴가 현황 -->
-  <section>
-    <h2>휴가 현황</h2>
+  <!-- ② 휴가 현황 -->
+  <div class="section c-vacation">
+    <div class="section-head">
+      <div class="section-bar"></div>
+      <div class="section-title">휴가 현황</div>
+      {% if entry.vacation %}<div class="section-count">{{ entry.vacation|length }}명</div>{% endif %}
+    </div>
     {% if entry.vacation %}
-    <table>
-      <thead><tr><th>파트</th><th>휴가코드</th><th>성명</th></tr></thead>
-      <tbody>
-      {% for v in entry.vacation %}
-      <tr><td>{{ v.part }}</td><td>{{ v.vacation_code }}</td><td>{{ v.staff_name }}</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <div class="empty">해당 없음</div>
-    {% endif %}
-  </section>
-
-  <!-- On-call -->
-  <section>
-    <h2>On-call</h2>
-    {% if entry.oncall %}
-    <table>
-      <thead><tr><th>파트</th><th>성명</th><th>전화받은 시각</th><th>사유</th></tr></thead>
-      <tbody>
-      {% for o in entry.oncall %}
-      <tr><td>{{ o.part }}</td><td>{{ o.staff_name }}</td><td>{{ o.received_time }}</td><td>{{ o.reason }}</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <div class="empty">해당 없음</div>
-    {% endif %}
-  </section>
-
-  <!-- 연장근무 -->
-  <section>
-    <h2>연장근무</h2>
-    {% if entry.overtime %}
-    <table>
-      <thead><tr><th>파트</th><th>성명</th><th>시작</th><th>종료</th><th>총시간</th><th>사유</th></tr></thead>
-      <tbody>
-      {% for ot in entry.overtime %}
-      <tr><td>{{ ot.part }}</td><td>{{ ot.staff_name }}</td><td>{{ ot.start_time }}</td><td>{{ ot.end_time }}</td><td>{{ format_hh_mm(ot.hours) if ot.hours else '' }}</td><td>{{ ot.reason }}</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <div class="empty">해당 없음</div>
-    {% endif %}
-  </section>
-
-  <!-- 장비 이력 -->
-  <section>
-    <h2>장비 이력</h2>
-    {% if entry.equipment %}
-    <table>
-      <thead><tr><th>장비명</th><th>유형</th><th>내용</th><th>엔지니어</th><th>시작</th><th>종료</th><th>다운타임</th><th>상태</th></tr></thead>
-      <tbody>
-      {% for e in entry.equipment %}
-      <tr>
-        <td>{{ e.equipment_name }}</td><td>{{ e.log_type }}</td><td>{{ e.description }}</td>
-        <td>{{ e.engineer }}</td><td>{{ e.start_time }}</td><td>{{ e.end_time }}</td>
-        <td>{{ e.downtime }}</td><td>{{ e.status }}</td>
-      </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <div class="empty">해당 없음</div>
-    {% endif %}
-  </section>
-
-  <!-- 특이사항·이슈 -->
-  <section>
-    <h2>특이사항·이슈</h2>
-    {% if entry.issues %}
-    <table>
-      <thead><tr><th>구분</th><th>심각도</th><th>제목</th><th>내용</th><th>상태</th></tr></thead>
-      <tbody>
-      {% for iss in entry.issues %}
-      <tr>
-        <td>{{ iss.category }}</td><td>{{ iss.severity }}</td>
-        <td>{{ iss.title }}</td><td>{{ iss.content }}</td><td>{{ iss.status }}</td>
-      </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <div class="empty">해당 없음</div>
-    {% endif %}
-  </section>
-
-  <!-- 야간 체크리스트 -->
-  <section>
-    <h2>야간 체크리스트</h2>
     <table>
       <thead>
         <tr>
-          <th style="width:36px">구분</th>
-          <th style="text-align:left">확인항목</th>
-          <th style="width:70px">문잠금상태</th>
-          <th style="width:80px">형광등 소등상태</th>
-          <th style="width:90px">냉·난방기구 ON-OFF</th>
-          <th style="text-align:left">비고</th>
-          <th style="text-align:left">확인결과</th>
+          <th style="width:62px">파트</th>
+          <th style="width:90px">휴가 코드</th>
+          <th>성명</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for v in entry.vacation %}
+      <tr>
+        <td class="text-center">{{ v.part }}</td>
+        <td class="text-center">{{ v.vacation_code }}</td>
+        <td>{{ v.staff_name }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <table><tbody><tr class="empty-row"><td>해당 없음</td></tr></tbody></table>
+    {% endif %}
+  </div>
+
+  <!-- ③ On-call -->
+  <div class="section c-oncall">
+    <div class="section-head">
+      <div class="section-bar"></div>
+      <div class="section-title">On-call</div>
+      {% if entry.oncall %}<div class="section-count">{{ entry.oncall|length }}건</div>{% endif %}
+    </div>
+    {% if entry.oncall %}
+    <table>
+      <thead>
+        <tr>
+          <th style="width:70px">파트</th>
+          <th style="width:70px">성명</th>
+          <th style="width:90px">전화받은 시각</th>
+          <th>사유</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for o in entry.oncall %}
+      <tr>
+        <td class="text-center">{{ o.part }}</td>
+        <td class="text-center">{{ o.staff_name }}</td>
+        <td class="text-center">{{ o.received_time }}</td>
+        <td>{{ o.reason }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <table><tbody><tr class="empty-row"><td>해당 없음</td></tr></tbody></table>
+    {% endif %}
+  </div>
+
+  <!-- ④ 연장근무 -->
+  <div class="section c-overtime">
+    <div class="section-head">
+      <div class="section-bar"></div>
+      <div class="section-title">연장근무</div>
+      {% if entry.overtime %}<div class="section-count">{{ entry.overtime|length }}건</div>{% endif %}
+    </div>
+    {% if entry.overtime %}
+    <table>
+      <thead>
+        <tr>
+          <th style="width:62px">파트</th>
+          <th style="width:62px">성명</th>
+          <th style="width:52px">시작</th>
+          <th style="width:52px">종료</th>
+          <th style="width:52px">총시간</th>
+          <th>사유</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for ot in entry.overtime %}
+      <tr>
+        <td class="text-center">{{ ot.part }}</td>
+        <td class="text-center">{{ ot.staff_name }}</td>
+        <td class="text-center">{{ ot.start_time }}</td>
+        <td class="text-center">{{ ot.end_time }}</td>
+        <td class="text-center">{{ format_hh_mm(ot.hours) if ot.hours else '' }}</td>
+        <td>{{ ot.reason }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <table><tbody><tr class="empty-row"><td>해당 없음</td></tr></tbody></table>
+    {% endif %}
+  </div>
+
+  <!-- ⑤ 장비 이력 -->
+  <div class="section c-equip">
+    <div class="section-head">
+      <div class="section-bar"></div>
+      <div class="section-title">장비 이력</div>
+      {% if entry.equipment %}<div class="section-count">{{ entry.equipment|length }}건</div>{% endif %}
+    </div>
+    {% if entry.equipment %}
+    <table>
+      <thead>
+        <tr>
+          <th style="width:80px">장비명</th>
+          <th style="width:46px">유형</th>
+          <th>내용</th>
+          <th style="width:58px">엔지니어</th>
+          <th style="width:46px">시작</th>
+          <th style="width:46px">종료</th>
+          <th style="width:52px">다운타임</th>
+          <th style="width:50px">상태</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for e in entry.equipment %}
+      <tr>
+        <td>{{ e.equipment_name }}</td>
+        <td class="text-center">{{ e.log_type }}</td>
+        <td>{{ e.description }}</td>
+        <td class="text-center">{{ e.engineer }}</td>
+        <td class="text-center">{{ e.start_time }}</td>
+        <td class="text-center">{{ e.end_time }}</td>
+        <td class="text-center">{{ e.downtime }}</td>
+        <td class="text-center">
+          <span class="w-tag {% if e.status == '완료' %}tag-done{% elif e.status in ('진행중', '처리중') %}tag-ing{% elif e.status %}tag-issue{% endif %}">{{ e.status }}</span>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <table><tbody><tr class="empty-row"><td>해당 없음</td></tr></tbody></table>
+    {% endif %}
+  </div>
+
+  <!-- ⑥ 특이사항·이슈 -->
+  <div class="section c-issue">
+    <div class="section-head">
+      <div class="section-bar"></div>
+      <div class="section-title">특이사항·이슈</div>
+      {% if entry.issues %}<div class="section-count">{{ entry.issues|length }}건</div>{% endif %}
+    </div>
+    {% if entry.issues %}
+    <table>
+      <thead>
+        <tr>
+          <th style="width:50px">구분</th>
+          <th style="width:46px">심각도</th>
+          <th style="width:110px">제목</th>
+          <th>내용</th>
+          <th style="width:50px">상태</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for iss in entry.issues %}
+      <tr>
+        <td class="text-center">{{ iss.category }}</td>
+        <td class="text-center {% if iss.severity == '높음' %}sev-high{% elif iss.severity == '중간' %}sev-mid{% else %}sev-low{% endif %}">{{ iss.severity }}</td>
+        <td>{{ iss.title }}</td>
+        <td>{{ iss.content }}</td>
+        <td class="text-center">
+          <span class="w-tag {% if iss.status == '해결' or iss.status == '완료' %}tag-done{% elif iss.status == '진행중' or iss.status == '처리중' %}tag-ing{% else %}tag-issue{% endif %}">{{ iss.status }}</span>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <table><tbody><tr class="empty-row"><td>해당 없음</td></tr></tbody></table>
+    {% endif %}
+  </div>
+
+  <!-- ⑦ 야간 체크리스트 -->
+  <div class="section c-check">
+    <div class="section-head">
+      <div class="section-bar"></div>
+      <div class="section-title">야간 체크리스트</div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:28px">No</th>
+          <th style="text-align:left">확인 항목</th>
+          <th style="width:60px">문잠금</th>
+          <th style="width:66px">형광등 소등</th>
+          <th style="width:72px">냉·난방기 ON/OFF</th>
+          <th style="text-align:left;width:90px">비고</th>
+          <th style="text-align:left">확인 결과</th>
         </tr>
       </thead>
       <tbody>
       {% for item in entry.night_checklist_items %}
       <tr>
-        <td style="text-align:center">{{ item.no }}</td>
+        <td class="text-center">{{ item.no }}</td>
         <td>{{ item.name }}</td>
-        <td style="text-align:center;font-weight:700;color:{{ '#2e7d32' if item.door_lock=='O' else ('#c62828' if item.door_lock=='X' else '#aaa') }}">{{ item.door_lock or '-' }}</td>
-        <td style="text-align:center;font-weight:700;color:{{ '#2e7d32' if item.light_off=='O' else ('#c62828' if item.light_off=='X' else '#aaa') }}">{{ item.light_off or '-' }}</td>
-        <td style="text-align:center;font-weight:700;color:{{ '#2e7d32' if item.hvac=='O' else ('#c62828' if item.hvac=='X' else '#aaa') }}">{{ item.hvac or '-' }}</td>
+        <td class="text-center {% if item.door_lock == 'O' %}check-o{% elif item.door_lock == 'X' %}check-x{% else %}check-na{% endif %}">{{ item.door_lock }}</td>
+        <td class="text-center {% if item.light_off == 'O' %}check-o{% elif item.light_off == 'X' %}check-x{% else %}check-na{% endif %}">{{ item.light_off }}</td>
+        <td class="text-center {% if item.hvac == 'O' %}check-o{% elif item.hvac == 'X' %}check-x{% else %}check-na{% endif %}">{{ item.hvac }}</td>
         <td>{{ item.remark }}</td>
         <td>{{ item.check_result }}</td>
       </tr>
       {% endfor %}
       </tbody>
     </table>
-  </section>
+  </div>
 
-  <footer>중앙대학교병원 영상의학과</footer>
+  <!-- 푸터 -->
+  <div class="doc-footer">
+    <span>중앙대학교병원 영상의학과</span>
+    <span>출력일시: {{ now }}</span>
+  </div>
+
 </div>
 {% endfor %}
 
