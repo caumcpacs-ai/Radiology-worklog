@@ -2,10 +2,11 @@
 영상의학과 업무일지 웹앱
 Flask + SQLite 기반 내부망 전용
 """
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_from_directory, abort
 from datetime import datetime, date, timedelta
 import sqlite3
 import os
+import uuid
 import hashlib
 import logging
 from logging.handlers import TimedRotatingFileHandler
@@ -44,6 +45,11 @@ def inject_now():
 DB_PATH          = os.path.join(os.path.dirname(__file__), 'instance', 'worklog.db')
 SPECIAL_EQ_DB    = os.path.join(os.path.dirname(__file__), 'instance', 'special_equipment.db')
 RADIATION_DB     = os.path.join(os.path.dirname(__file__), 'instance', 'radiation_device.db')
+
+# PDF 첨부파일 저장 경로
+UPLOAD_ROOT      = os.path.join(os.path.dirname(__file__), 'instance', 'uploads')
+SPECIAL_EQ_UPLOAD = os.path.join(UPLOAD_ROOT, 'special_equipment')
+RADIATION_UPLOAD  = os.path.join(UPLOAD_ROOT, 'radiation_device')
 
 PARTS = ['GR', 'CT', 'MR', '인터벤션', '간호']
 
@@ -364,6 +370,7 @@ def init_db():
 def init_special_eq_db():
     """특수의료장비 전용 DB 초기화 (instance/special_equipment.db)"""
     os.makedirs(os.path.dirname(SPECIAL_EQ_DB), exist_ok=True)
+    os.makedirs(SPECIAL_EQ_UPLOAD, exist_ok=True)
     conn = get_special_eq_db()
     c = conn.cursor()
     c.execute("PRAGMA journal_mode=WAL")
@@ -378,6 +385,15 @@ def init_special_eq_db():
         radiographer2 TEXT DEFAULT '',
         note TEXT DEFAULT '',
         created_at TEXT DEFAULT (datetime('now','localtime'))
+    )''')
+    # 첨부 PDF 파일 (장비별 다건 누적)
+    c.execute('''CREATE TABLE IF NOT EXISTS special_equipment_files (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        equipment_id INTEGER NOT NULL,
+        original_name TEXT NOT NULL,
+        stored_name TEXT NOT NULL,
+        uploaded_by TEXT DEFAULT '',
+        uploaded_at TEXT DEFAULT (datetime('now','localtime'))
     )''')
     conn.commit()
 
@@ -403,6 +419,7 @@ def init_special_eq_db():
 def init_radiation_db():
     """진단용방사선발생장치 전용 DB 초기화 (instance/radiation_device.db)"""
     os.makedirs(os.path.dirname(RADIATION_DB), exist_ok=True)
+    os.makedirs(RADIATION_UPLOAD, exist_ok=True)
     conn = get_radiation_db()
     c = conn.cursor()
     c.execute("PRAGMA journal_mode=WAL")
@@ -420,6 +437,15 @@ def init_radiation_db():
         first_use_date TEXT DEFAULT '',
         note TEXT DEFAULT '',
         created_at TEXT DEFAULT (datetime('now','localtime'))
+    )''')
+    # 첨부 PDF 파일 (장치별 다건 누적)
+    c.execute('''CREATE TABLE IF NOT EXISTS radiation_device_files (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        device_id INTEGER NOT NULL,
+        original_name TEXT NOT NULL,
+        stored_name TEXT NOT NULL,
+        uploaded_by TEXT DEFAULT '',
+        uploaded_at TEXT DEFAULT (datetime('now','localtime'))
     )''')
     conn.commit()
 
@@ -1315,10 +1341,18 @@ def overtime_list():
 @login_required
 def special_equipment_list():
     conn = get_special_eq_db()
-    special_equips = conn.execute(
+    rows = conn.execute(
         "SELECT * FROM special_equipment ORDER BY category, equipment_name"
     ).fetchall()
+    counts = dict(conn.execute(
+        "SELECT equipment_id, COUNT(*) FROM special_equipment_files GROUP BY equipment_id"
+    ).fetchall())
     conn.close()
+    special_equips = []
+    for r in rows:
+        d = dict(r)
+        d['file_count'] = counts.get(r['id'], 0)
+        special_equips.append(d)
     return render_template('special_equipment.html', special_equips=special_equips)
 
 
@@ -1329,10 +1363,18 @@ def special_equipment_list():
 @login_required
 def radiation_device_list():
     conn = get_radiation_db()
-    radiation_devs = conn.execute(
+    rows = conn.execute(
         "SELECT * FROM radiation_device ORDER BY id"
     ).fetchall()
+    counts = dict(conn.execute(
+        "SELECT device_id, COUNT(*) FROM radiation_device_files GROUP BY device_id"
+    ).fetchall())
     conn.close()
+    radiation_devs = []
+    for r in rows:
+        d = dict(r)
+        d['file_count'] = counts.get(r['id'], 0)
+        radiation_devs.append(d)
     return render_template('radiation_device.html', radiation_devs=radiation_devs)
 
 
@@ -2135,10 +2177,78 @@ def special_equipment_edit(eid):
 @login_required
 def special_equipment_delete(eid):
     conn = get_special_eq_db()
+    # 첨부 PDF 파일도 함께 삭제
+    files = conn.execute("SELECT stored_name FROM special_equipment_files WHERE equipment_id=?", (eid,)).fetchall()
+    for f in files:
+        try:
+            os.remove(os.path.join(SPECIAL_EQ_UPLOAD, f['stored_name']))
+        except OSError:
+            pass
+    conn.execute("DELETE FROM special_equipment_files WHERE equipment_id=?", (eid,))
     conn.execute("DELETE FROM special_equipment WHERE id=?", (eid,))
     conn.commit()
     conn.close()
     return redirect(url_for('special_equipment_list'))
+
+
+# ── 특수의료장비 PDF 첨부파일 ──
+@app.route('/special-equipment/<int:eid>/files')
+@login_required
+def special_equipment_files(eid):
+    conn = get_special_eq_db()
+    rows = conn.execute(
+        "SELECT id, original_name, uploaded_by, uploaded_at FROM special_equipment_files WHERE equipment_id=? ORDER BY id DESC",
+        (eid,)).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route('/special-equipment/<int:eid>/upload', methods=['POST'])
+@login_required
+def special_equipment_upload(eid):
+    f = request.files.get('pdf_file')
+    if not f or not f.filename:
+        return jsonify({'ok': False, 'error': '파일이 없습니다.'}), 400
+    if not f.filename.lower().endswith('.pdf'):
+        return jsonify({'ok': False, 'error': 'PDF 파일만 업로드할 수 있습니다.'}), 400
+    os.makedirs(SPECIAL_EQ_UPLOAD, exist_ok=True)
+    stored = uuid.uuid4().hex + '.pdf'
+    f.save(os.path.join(SPECIAL_EQ_UPLOAD, stored))
+    conn = get_special_eq_db()
+    conn.execute(
+        "INSERT INTO special_equipment_files (equipment_id, original_name, stored_name, uploaded_by) VALUES (?,?,?,?)",
+        (eid, f.filename, stored, session.get('name', '')))
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/special-equipment/file/<int:fid>/view')
+@login_required
+def special_equipment_file_view(fid):
+    conn = get_special_eq_db()
+    row = conn.execute("SELECT * FROM special_equipment_files WHERE id=?", (fid,)).fetchone()
+    conn.close()
+    if not row:
+        abort(404)
+    return send_from_directory(SPECIAL_EQ_UPLOAD, row['stored_name'],
+                               mimetype='application/pdf', download_name=row['original_name'])
+
+
+@app.route('/special-equipment/file/<int:fid>/delete', methods=['POST'])
+@login_required
+def special_equipment_file_delete(fid):
+    conn = get_special_eq_db()
+    row = conn.execute("SELECT stored_name FROM special_equipment_files WHERE id=?", (fid,)).fetchone()
+    if row:
+        try:
+            os.remove(os.path.join(SPECIAL_EQ_UPLOAD, row['stored_name']))
+        except OSError:
+            pass
+        conn.execute("DELETE FROM special_equipment_files WHERE id=?", (fid,))
+        conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
 
 
 # ════════════════════════════════════════════════════
@@ -2195,10 +2305,78 @@ def radiation_device_edit(eid):
 @login_required
 def radiation_device_delete(eid):
     conn = get_radiation_db()
+    # 첨부 PDF 파일도 함께 삭제
+    files = conn.execute("SELECT stored_name FROM radiation_device_files WHERE device_id=?", (eid,)).fetchall()
+    for f in files:
+        try:
+            os.remove(os.path.join(RADIATION_UPLOAD, f['stored_name']))
+        except OSError:
+            pass
+    conn.execute("DELETE FROM radiation_device_files WHERE device_id=?", (eid,))
     conn.execute("DELETE FROM radiation_device WHERE id=?", (eid,))
     conn.commit()
     conn.close()
     return redirect(url_for('radiation_device_list'))
+
+
+# ── 진단용방사선발생장치 PDF 첨부파일 ──
+@app.route('/radiation-device/<int:eid>/files')
+@login_required
+def radiation_device_files(eid):
+    conn = get_radiation_db()
+    rows = conn.execute(
+        "SELECT id, original_name, uploaded_by, uploaded_at FROM radiation_device_files WHERE device_id=? ORDER BY id DESC",
+        (eid,)).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route('/radiation-device/<int:eid>/upload', methods=['POST'])
+@login_required
+def radiation_device_upload(eid):
+    f = request.files.get('pdf_file')
+    if not f or not f.filename:
+        return jsonify({'ok': False, 'error': '파일이 없습니다.'}), 400
+    if not f.filename.lower().endswith('.pdf'):
+        return jsonify({'ok': False, 'error': 'PDF 파일만 업로드할 수 있습니다.'}), 400
+    os.makedirs(RADIATION_UPLOAD, exist_ok=True)
+    stored = uuid.uuid4().hex + '.pdf'
+    f.save(os.path.join(RADIATION_UPLOAD, stored))
+    conn = get_radiation_db()
+    conn.execute(
+        "INSERT INTO radiation_device_files (device_id, original_name, stored_name, uploaded_by) VALUES (?,?,?,?)",
+        (eid, f.filename, stored, session.get('name', '')))
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/radiation-device/file/<int:fid>/view')
+@login_required
+def radiation_device_file_view(fid):
+    conn = get_radiation_db()
+    row = conn.execute("SELECT * FROM radiation_device_files WHERE id=?", (fid,)).fetchone()
+    conn.close()
+    if not row:
+        abort(404)
+    return send_from_directory(RADIATION_UPLOAD, row['stored_name'],
+                               mimetype='application/pdf', download_name=row['original_name'])
+
+
+@app.route('/radiation-device/file/<int:fid>/delete', methods=['POST'])
+@login_required
+def radiation_device_file_delete(fid):
+    conn = get_radiation_db()
+    row = conn.execute("SELECT stored_name FROM radiation_device_files WHERE id=?", (fid,)).fetchone()
+    if row:
+        try:
+            os.remove(os.path.join(RADIATION_UPLOAD, row['stored_name']))
+        except OSError:
+            pass
+        conn.execute("DELETE FROM radiation_device_files WHERE id=?", (fid,))
+        conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
 
 
 # ════════════════════════════════════════════════════
