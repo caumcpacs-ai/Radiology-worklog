@@ -38,6 +38,7 @@
         <th>제조사</th>
         <th>최초사용신고일</th>
         <th>비고</th>
+        <th>증명서(PDF)</th>
         <th>관리</th>
       </tr>
     </thead>
@@ -57,6 +58,11 @@
       <td style="font-size:11px">{{ rd.first_use_date }}</td>
       <td style="color:#666;font-size:11px">{{ rd.note }}</td>
       <td>
+        <button class="btn btn-sm btn-info" onclick="openFilesModal({{ rd.id }}, '{{ rd.model_name|e }}')">
+          📎 {{ rd.file_count }}건
+        </button>
+      </td>
+      <td>
         <div class="btn-group">
           <button class="btn btn-sm btn-warning"
             onclick="openRdEditModal({{ rd.id }},
@@ -72,7 +78,7 @@
       </td>
     </tr>
     {% else %}
-    <tr><td colspan="13" style="text-align:center;color:#aaa;padding:24px">등록된 장치가 없습니다.</td></tr>
+    <tr><td colspan="14" style="text-align:center;color:#aaa;padding:24px">등록된 장치가 없습니다.</td></tr>
     {% endfor %}
     </tbody>
   </table>
@@ -147,7 +153,94 @@
   </div>
 </div>
 
+<!-- PDF 첨부파일 모달 -->
+<div class="eq-modal-bg" id="filesModal">
+  <div class="eq-modal" style="width:620px">
+    <h3 id="filesModalTitle">증명서 파일</h3>
+    <form id="uploadForm" onsubmit="return uploadFile(event)" style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
+      <input type="file" name="pdf_file" id="pdfFileInput" accept="application/pdf" required style="flex:1">
+      <button type="submit" class="btn btn-primary btn-sm">업로드</button>
+    </form>
+    <div id="filesList" style="border-top:1px solid #eee">
+      <div style="text-align:center;color:#aaa;padding:20px">불러오는 중...</div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeFilesModal()">닫기</button>
+    </div>
+  </div>
+</div>
+
 <script>
+var filesCtx = { type: 'radiation-device', id: null };
+
+function openFilesModal(id, name) {
+  filesCtx.id = id;
+  document.getElementById('filesModalTitle').textContent = name + ' - 증명서 파일';
+  document.getElementById('uploadForm').reset();
+  document.getElementById('filesModal').classList.add('open');
+  loadFiles();
+}
+
+function closeFilesModal() {
+  document.getElementById('filesModal').classList.remove('open');
+}
+
+function loadFiles() {
+  var list = document.getElementById('filesList');
+  list.innerHTML = '<div style="text-align:center;color:#aaa;padding:20px">불러오는 중...</div>';
+  fetch('/' + filesCtx.type + '/' + filesCtx.id + '/files')
+    .then(function(r){ return r.json(); })
+    .then(function(files){
+      if (!files.length) {
+        list.innerHTML = '<div style="text-align:center;color:#aaa;padding:20px">등록된 파일이 없습니다.</div>';
+        return;
+      }
+      list.innerHTML = files.map(function(f){
+        return '<div style="display:flex;align-items:center;gap:8px;padding:9px 4px;border-bottom:1px solid #f0f0f0">'
+          + '<span style="flex:1;cursor:pointer;color:#1a73e8;font-size:13px;word-break:break-all" '
+          + 'onclick="window.open(\'/' + filesCtx.type + '/file/' + f.id + '/view\',\'_blank\')">📄 '
+          + escapeHtml(f.original_name) + '</span>'
+          + '<span style="font-size:11px;color:#999;white-space:nowrap">' + (f.uploaded_by||'') + ' ' + (f.uploaded_at||'') + '</span>'
+          + '<button class="btn btn-sm btn-danger" onclick="deleteFile(' + f.id + ')">삭제</button>'
+          + '</div>';
+      }).join('');
+    });
+}
+
+function uploadFile(e) {
+  e.preventDefault();
+  var input = document.getElementById('pdfFileInput');
+  if (!input.files.length) return false;
+  var fd = new FormData();
+  fd.append('pdf_file', input.files[0]);
+  fetch('/' + filesCtx.type + '/' + filesCtx.id + '/upload', { method:'POST', body: fd })
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if (res.ok) {
+        document.getElementById('uploadForm').reset();
+        loadFiles();
+      } else {
+        alert(res.error || '업로드 실패');
+      }
+    });
+  return false;
+}
+
+function deleteFile(fid) {
+  if (!confirm('이 파일을 삭제하시겠습니까?')) return;
+  fetch('/' + filesCtx.type + '/file/' + fid + '/delete', { method:'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(){ loadFiles(); });
+}
+
+function escapeHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+document.getElementById('filesModal').addEventListener('click', function(e){
+  if (e.target === this) closeFilesModal();
+});
+
 function openRdModal() {
   document.getElementById('rdModalTitle').textContent = '진단용방사선발생장치 신규 추가';
   document.getElementById('rdForm').action = '/radiation-device/add';
