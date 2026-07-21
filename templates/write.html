@@ -506,7 +506,10 @@
                 <div class="field"><label>장비명</label><input type="text" name="equipment_name" value="{{ e.equipment_name }}" required></div>
                 <div class="field narrow"><label>유형</label>
                   <select name="log_type">
-                    {% for t in ['고장','점검','수리완료','PM'] %}<option value="{{ t }}" {{ 'selected' if e.log_type==t }}>{{ t }}</option>{% endfor %}
+                    {% for t in ['고장','점검','PM','기타'] %}<option value="{{ t }}" {{ 'selected' if e.log_type==t }}>{{ t }}</option>{% endfor %}
+                    {% if e.log_type not in ['고장','점검','PM','기타'] and e.log_type %}
+                    <option value="{{ e.log_type }}" selected>{{ e.log_type }}</option>
+                    {% endif %}
                   </select>
                 </div>
                 <div class="field wide"><label>내용</label><input type="text" name="description" value="{{ e.description }}"></div>
@@ -537,7 +540,7 @@
           <div class="field"><label>장비명</label><input type="text" name="equipment_name" placeholder="장비명" required></div>
           <div class="field narrow"><label>유형</label>
             <select name="log_type">
-              {% for t in ['고장','점검','수리완료','PM'] %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+              {% for t in ['고장','점검','PM','기타'] %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
             </select>
           </div>
           <div class="field wide"><label>내용</label><input type="text" name="description" placeholder="내용"></div>
@@ -567,10 +570,11 @@
   <div class="accordion-body" id="sec-issues">
     {% if issues %}
     <table class="section-table" style="margin-top:12px">
-      <thead><tr><th>구분</th><th>심각도</th><th>제목</th><th>내용</th><th>상태</th><th></th></tr></thead>
+      <thead><tr><th>유형</th><th>구분</th><th>심각도</th><th>제목</th><th>내용</th><th>상태</th><th></th></tr></thead>
       <tbody>
       {% for iss in issues %}
       <tr>
+        <td>{{ iss.record_type }}</td>
         <td>{{ iss.category }}</td>
         <td><span class="badge {{ 'badge-danger' if iss.severity=='긴급' else ('badge-warning' if iss.severity=='중요' else 'badge-secondary') }}">{{ iss.severity }}</span></td>
         <td>{{ iss.title }}</td>
@@ -586,9 +590,14 @@
           <div id="iss-edit-{{ iss.id }}" style="display:none;margin-top:8px">
             <form method="post" action="/write/issue/edit/{{ iss.id }}">
               <div class="grid-row">
+                <div class="field narrow"><label>유형</label>
+                  <select name="record_type">
+                    {% for t in ['특이사항','이슈'] %}<option value="{{ t }}" {{ 'selected' if iss.record_type==t }}>{{ t }}</option>{% endfor %}
+                  </select>
+                </div>
                 <div class="field narrow"><label>구분</label>
                   <select name="category">
-                    {% for c in ['장비','환자','행정','기타'] %}<option value="{{ c }}" {{ 'selected' if iss.category==c }}>{{ c }}</option>{% endfor %}
+                    {% for c in ['장비','검사','환자','행정','기타'] %}<option value="{{ c }}" {{ 'selected' if iss.category==c }}>{{ c }}</option>{% endfor %}
                   </select>
                 </div>
                 <div class="field narrow"><label>심각도</label>
@@ -600,7 +609,7 @@
                 <div class="field wide"><label>내용</label><input type="text" name="content" value="{{ iss.content }}"></div>
                 <div class="field narrow"><label>상태</label>
                   <select name="status">
-                    {% for st in ['진행중','해결','보류'] %}<option value="{{ st }}" {{ 'selected' if iss.status==st }}>{{ st }}</option>{% endfor %}
+                    {% for st in ['진행중','완료','보류'] %}<option value="{{ st }}" {{ 'selected' if iss.status==st }}>{{ st }}</option>{% endfor %}
                   </select>
                 </div>
                 <div class="field" style="flex:0"><label>&nbsp;</label><button class="btn btn-primary" type="submit">저장</button></div>
@@ -617,9 +626,14 @@
       <form method="post" action="/write/issue/add">
         <input type="hidden" name="date" value="{{ sel }}">
         <div class="grid-row">
+          <div class="field narrow"><label>유형</label>
+            <select name="record_type">
+              {% for t in ['특이사항','이슈'] %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+            </select>
+          </div>
           <div class="field narrow"><label>구분</label>
             <select name="category">
-              {% for c in ['장비','환자','행정','기타'] %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+              {% for c in ['장비','검사','환자','행정','기타'] %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
             </select>
           </div>
           <div class="field narrow"><label>심각도</label>
@@ -631,7 +645,7 @@
           <div class="field wide"><label>내용</label><input type="text" name="content" placeholder="내용"></div>
           <div class="field narrow"><label>상태</label>
             <select name="status">
-              {% for st in ['진행중','해결','보류'] %}<option value="{{ st }}">{{ st }}</option>{% endfor %}
+              {% for st in ['진행중','완료','보류'] %}<option value="{{ st }}">{{ st }}</option>{% endfor %}
             </select>
           </div>
           <div class="field" style="flex:0"><label>&nbsp;</label><button class="btn btn-primary" type="submit">추가</button></div>

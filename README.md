@@ -61,7 +61,7 @@ python app.py
 - 항목별 수정 / 삭제
 
 ### 5. 장비 이력
-- 장비명, 유형(고장/점검/수리완료/PM), 내용, 엔지니어, 다운타임, 상태 등록
+- 장비명, 유형(고장/점검/PM/기타), 내용, 엔지니어, 다운타임, 상태 등록
 - 항목별 수정 / 삭제
 
 ### 6. 인수인계
@@ -106,11 +106,13 @@ python app.py
 ```
 radiology_worklog/
 ├── app.py                  ← 메인 Flask 앱 (라우트 및 DB 로직)
+├── backup_db.py            ← DB 자동 백업 스크립트 (작업 스케줄러로 매일 08:00 실행)
 ├── requirements.txt        ← 패키지 목록
 ├── README.md               ← 이 파일
 ├── CLAUDE.md               ← Claude Code 프로젝트 문서 (README와 동기화)
 ├── instance/
 │   └── worklog.db         ← SQLite DB (자동 생성)
+├── backups/                ← 날짜별 DB 백업 + backup.log (자동 생성)
 └── templates/
     ├── base.html           ← 공통 레이아웃 (사이드바, 상단바)
     ├── login.html          ← 로그인 페이지
@@ -212,6 +214,29 @@ radiology_worklog/
 
 ## 💾 데이터 백업
 `instance/worklog.db` 파일을 복사하면 전체 데이터가 백업됩니다.
+
+### 자동 백업 (매일 08:00)
+- `backup_db.py` 스크립트가 SQLite 온라인 백업 API를 사용하므로 **앱 실행 중에도 안전하게** 백업됩니다.
+- 백업 파일: `backups/worklog_YYYY-MM-DD.db` (30일 경과분은 자동 삭제, `KEEP_DAYS`로 조정)
+- 실행 로그: `backups/backup.log`
+- Windows 작업 스케줄러에 `RadiologyWorklog_DB_Backup` 작업으로 등록되어 매일 08:00 실행 (08:00에 PC가 꺼져 있었다면 켜진 후 자동 실행)
+
+```powershell
+# 수동 백업 실행
+python backup_db.py
+
+# 스케줄러 작업 확인
+Get-ScheduledTaskInfo -TaskName "RadiologyWorklog_DB_Backup"
+
+# 스케줄러 작업 삭제
+Unregister-ScheduledTask -TaskName "RadiologyWorklog_DB_Backup"
+```
+
+> 작업은 현재 사용자 계정으로 등록되어 **로그온 상태에서만** 실행됩니다. 로그아웃 상태에서도 실행하려면 작업 스케줄러(`taskschd.msc`)에서 "사용자의 로그온 여부에 관계없이 실행" 옵션으로 변경하세요.
+
+### 복원
+1. 앱 종료 후 `instance/worklog.db`를 백업 파일로 교체
+2. 앱 재실행
 
 ## ⚙️ 커스터마이징
 - 포트 변경: `app.py` 마지막 줄 `port=1000` 수정

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "radiology_worklog",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["app.py"],
+      "port": 1000
+    }
+  ]
+}

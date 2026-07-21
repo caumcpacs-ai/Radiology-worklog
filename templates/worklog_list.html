@@ -73,7 +73,13 @@
           <input type="checkbox" class="row-chk" value="{{ log.date }}"
                  onchange="updateSel()" style="width:auto;cursor:pointer">
         </td>
-        <td><a href="/write?date={{ log.date }}" style="font-weight:600;color:#1a73e8">{{ log.date }}</a></td>
+        <td>
+          {% if log.wl_status in ('제출', '확정') %}
+            <a href="#" onclick="window.open('/print/{{ log.date }}', 'worklog_popup_{{ log.date }}', 'width=900,height=900,scrollbars=yes'); return false;" style="font-weight:600;color:#1a73e8">{{ log.date }}</a>
+          {% else %}
+            <a href="/write?date={{ log.date }}" style="font-weight:600;color:#1a73e8">{{ log.date }}</a>
+          {% endif %}
+        </td>
         <td>
           {% if log.wl_status == '제출' %}
             <span class="badge badge-info">제출</span>

@@ -50,19 +50,39 @@ label{display:block;margin-bottom:4px;font-weight:500;color:#555}
 .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
 
 /* ── 사이드바 ── */
-.sidebar{position:fixed;left:0;top:0;bottom:0;width:200px;background:#1e2a3a;color:#fff;padding:0;overflow-y:auto;z-index:100;display:flex;flex-direction:column}
-.sidebar-header{padding:18px 16px;background:#152232;font-size:13px;font-weight:700;border-bottom:1px solid #2a3f55}
+:root{--sidebar-width:200px;--sidebar-collapsed:52px}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:var(--sidebar-width);background:#1e2a3a;color:#fff;padding:0;overflow-y:auto;overflow-x:hidden;z-index:100;display:flex;flex-direction:column;transition:width 0.3s cubic-bezier(0.4,0,0.2,1)}
+.sidebar.collapsed{width:var(--sidebar-collapsed)}
+.sidebar-header{padding:18px 16px;background:#152232;font-size:13px;font-weight:700;border-bottom:1px solid #2a3f55;display:flex;align-items:flex-start;gap:8px;white-space:nowrap}
+.sidebar-header .header-text{opacity:1;transition:opacity 0.2s}
+.sidebar.collapsed .header-text{opacity:0;pointer-events:none}
 .sidebar-header .dept{color:#8ab4f8;font-size:11px;margin-top:2px}
-.sidebar nav a{display:block;padding:10px 16px;color:#b0bec5;font-size:13px;border-left:3px solid transparent;transition:.2s}
+.sidebar nav a{display:flex;align-items:center;gap:8px;padding:10px 16px;color:#b0bec5;font-size:13px;border-left:3px solid transparent;transition:.2s;white-space:nowrap}
+.sidebar nav a span{opacity:1;transition:opacity 0.2s}
+.sidebar.collapsed nav a span{opacity:0;pointer-events:none}
 .sidebar nav a:hover,.sidebar nav a.active{background:#2a3f55;color:#fff;border-left-color:#1a73e8}
-.sidebar nav .nav-section{padding:8px 16px 4px;font-size:10px;color:#546e7a;text-transform:uppercase;letter-spacing:.8px;margin-top:4px}
-.sidebar-footer{padding:12px 16px;border-top:1px solid #2a3f55;font-size:12px;color:#78909c}
+.sidebar nav .nav-section{padding:8px 16px 4px;font-size:10px;color:#546e7a;text-transform:uppercase;letter-spacing:.8px;margin-top:4px;white-space:nowrap}
+.sidebar nav .nav-section span{opacity:1;transition:opacity 0.2s}
+.sidebar.collapsed .nav-section span{opacity:0;pointer-events:none}
+.sidebar-footer{padding:12px 16px;border-top:1px solid #2a3f55;font-size:12px;color:#78909c;white-space:nowrap}
+.sidebar-footer .footer-text{opacity:1;transition:opacity 0.2s}
+.sidebar.collapsed .footer-text{opacity:0;pointer-events:none}
 
 /* ── 메인 콘텐츠 ── */
-.main{margin-left:200px;min-height:100vh}
-.topbar{background:#fff;padding:12px 24px;border-bottom:1px solid #e0e0e0;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:50}
+.main{margin-left:var(--sidebar-width);min-height:100vh;transition:margin-left 0.3s cubic-bezier(0.4,0,0.2,1)}
+.sidebar.collapsed+.main{margin-left:var(--sidebar-collapsed)}
+.topbar{background:#fff;padding:12px 24px;border-bottom:1px solid #e0e0e0;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:50;gap:12px}
 .topbar .page-title{font-size:16px;font-weight:700;color:#1e2a3a}
 .content{padding:20px 24px 60px}
+#sidebar-toggle{background:#e8f0fe;border:none;color:#1a73e8;width:36px;height:36px;border-radius:8px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background 0.2s,color 0.2s}
+#sidebar-toggle:hover{background:#1a73e8;color:#fff}
+@media(max-width:768px){
+  .sidebar{left:calc(-1 * var(--sidebar-width));width:var(--sidebar-width);transition:left 0.3s cubic-bezier(0.4,0,0.2,1)}
+  .sidebar.active{left:0}
+  .sidebar.collapsed{width:var(--sidebar-width)}
+  .sidebar nav a span,.sidebar.collapsed nav a span,.sidebar-header .header-text,.sidebar.collapsed .header-text,.sidebar-footer .footer-text,.sidebar.collapsed .footer-text{opacity:1;pointer-events:auto}
+  .main,.sidebar.collapsed+.main{margin-left:0}
+}
 
 /* ── 통계 카드 ── */
 .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
@@ -88,34 +108,42 @@ label{display:block;margin-bottom:4px;font-weight:500;color:#555}
 </head>
 <body>
 
-<div class="sidebar">
+<div class="sidebar" id="sidebar">
   <div class="sidebar-header">
-    🏥 영상의학과 업무일지
-    <div class="dept">Radiology Dept.</div>
+    🏥 <div class="header-text">영상의학과 업무일지<div class="dept">Radiology Dept.</div></div>
   </div>
   <nav style="flex:1">
-    <a href="{{ url_for('dashboard') }}"    class="{{ 'active' if request.endpoint=='dashboard' }}">📊 메인</a>
-    <a href="{{ url_for('write') }}"        class="{{ 'active' if 'write' in request.endpoint }}">✏️ 업무일지 작성</a>
-    <a href="{{ url_for('worklog_list') }}" class="{{ 'active' if request.endpoint=='worklog_list' }}">📋 업무일지 리스트</a>
-    <div class="nav-section">근무 현황</div>
-    <a href="{{ url_for('oncall_list') }}"   style="padding-left:24px;font-size:12px" class="{{ 'active' if request.endpoint=='oncall_list' }}">📞 On-call 리스트</a>
-    <a href="{{ url_for('overtime_list') }}" style="padding-left:24px;font-size:12px" class="{{ 'active' if request.endpoint=='overtime_list' }}">⏰ 연장근무 리스트</a>
-    <div class="nav-section">장비 현황</div>
-    <a href="{{ url_for('special_equipment_list') }}" style="padding-left:24px;font-size:12px" class="{{ 'active' if request.endpoint=='special_equipment_list' }}">🏥 특수의료장비현황</a>
-    <a href="{{ url_for('radiation_device_list') }}"  style="padding-left:24px;font-size:12px" class="{{ 'active' if request.endpoint=='radiation_device_list' }}">☢️ 진단용방사선발생장치</a>
+    <a href="{{ url_for('dashboard') }}"    onclick="goHome(event)" class="{{ 'active' if request.endpoint=='dashboard' }}">📊 <span>메인</span></a>
+    <a href="{{ url_for('write') }}"        class="{{ 'active' if 'write' in request.endpoint }}">✏️ <span>업무일지 작성</span></a>
+    <a href="{{ url_for('worklog_list') }}" class="{{ 'active' if request.endpoint=='worklog_list' }}">📋 <span>업무일지 리스트</span></a>
+    <a href="{{ url_for('schedule_view') }}" class="{{ 'active' if 'schedule' in request.endpoint }}">📅 <span>일정관리</span></a>
+    <div class="nav-section"><span>근무 현황</span></div>
+    <a href="{{ url_for('oncall_list') }}"   style="padding-left:24px;font-size:12px" class="{{ 'active' if request.endpoint=='oncall_list' }}">📞 <span>On-call 리스트</span></a>
+    <a href="{{ url_for('overtime_list') }}" style="padding-left:24px;font-size:12px" class="{{ 'active' if request.endpoint=='overtime_list' }}">⏰ <span>연장근무 리스트</span></a>
+    <div class="nav-section"><span>특이사항</span></div>
+    <a href="{{ url_for('special_note_list') }}" style="padding-left:24px;font-size:12px" class="{{ 'active' if request.endpoint=='special_note_list' }}">📝 <span>특이사항 리스트</span></a>
+    <a href="{{ url_for('issue_list') }}"        style="padding-left:24px;font-size:12px" class="{{ 'active' if request.endpoint=='issue_list' }}">⚠️ <span>이슈 리스트</span></a>
+    <div class="nav-section"><span>장비 현황</span></div>
+    <a href="{{ url_for('maintenance_list') }}" style="padding-left:24px;font-size:12px" class="{{ 'active' if request.endpoint=='maintenance_list' }}">🔧 <span>유지보수현황</span></a>
+    <a href="{{ url_for('special_equipment_list') }}" style="padding-left:24px;font-size:12px" class="{{ 'active' if request.endpoint=='special_equipment_list' }}">🏥 <span>특수의료장비현황</span></a>
+    <a href="{{ url_for('radiation_device_list') }}"  style="padding-left:24px;font-size:12px" class="{{ 'active' if request.endpoint=='radiation_device_list' }}">☢️ <span>진단용방사선발생장치</span></a>
+    <a href="{{ url_for('equipment_history_list') }}" style="padding-left:24px;font-size:12px" class="{{ 'active' if request.endpoint=='equipment_history_list' }}">🛠️ <span>장비이력 리스트</span></a>
     {% if session.role == 'admin' %}
-    <div class="nav-section">관리</div>
-    <a href="{{ url_for('users') }}" class="{{ 'active' if 'user' in request.endpoint }}">👥 사용자 관리</a>
+    <div class="nav-section"><span>관리</span></div>
+    <a href="{{ url_for('users') }}" class="{{ 'active' if 'user' in request.endpoint }}">👥 <span>사용자 관리</span></a>
     {% endif %}
   </nav>
-  <div class="sidebar-footer" style="display:flex;flex-direction:column;align-items:flex-start;gap:8px">
-    <div>👤 <a href="{{ url_for('profile') }}" style="color:#fff;text-decoration:underline">{{ session.name }}</a> ({{ '관리자' if session.role == 'admin' else '사용자' }})</div>
-    <div><a href="{{ url_for('logout') }}" style="color:#ef9a9a">로그아웃</a></div>
+  <div class="sidebar-footer">
+    <div class="footer-text" style="display:flex;flex-direction:column;gap:10px">
+      <div>👤 <a href="{{ url_for('profile') }}" style="color:#fff;text-decoration:underline">{{ session.name }}</a> ({{ '관리자' if session.role == 'admin' else '사용자' }})</div>
+      <div><a href="{{ url_for('logout') }}" style="color:#ef9a9a">로그아웃</a></div>
+    </div>
   </div>
 </div>
 
 <div class="main">
   <div class="topbar">
+    <button id="sidebar-toggle" title="메뉴 토글">☰</button>
     <div class="page-title">{% block page_title %}{% endblock %}</div>
     <div class="text-muted">{{ now }}</div>
   </div>
@@ -128,5 +156,37 @@ label{display:block;margin-bottom:4px;font-weight:500;color:#555}
     {% block content %}{% endblock %}
   </div>
 </div>
+<script>
+// 메인 클릭: 항상 today 일자(date 파라미터 없음)로 이동하며 새로고침
+function goHome(e) {
+  e.preventDefault();
+  if (window.location.pathname === '/' && !window.location.search) {
+    window.location.reload();
+  } else {
+    window.location.href = '/';
+  }
+}
+(function() {
+  const sidebar = document.getElementById('sidebar');
+  const toggleBtn = document.getElementById('sidebar-toggle');
+  if (!sidebar || !toggleBtn) return;
+
+  toggleBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (window.innerWidth <= 768) {
+      sidebar.classList.toggle('active');
+    } else {
+      sidebar.classList.toggle('collapsed');
+    }
+  });
+
+  document.addEventListener('click', function(e) {
+    if (window.innerWidth <= 768 && sidebar.classList.contains('active') &&
+        !sidebar.contains(e.target) && !toggleBtn.contains(e.target)) {
+      sidebar.classList.remove('active');
+    }
+  });
+})();
+</script>
 </body>
 </html>

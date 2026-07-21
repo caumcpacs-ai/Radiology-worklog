@@ -58,9 +58,11 @@ Win + R → cmd → python --version
 ```
 C:\radiology_worklog\
   ├── app.py
+  ├── backup_db.py     ← DB 자동 백업 스크립트 (6. 데이터 백업 참고)
   ├── requirements.txt
   ├── templates\
-  └── instance\        ← DB가 여기에 자동 생성됨
+  ├── instance\        ← DB가 여기에 자동 생성됨
+  └── backups\         ← 날짜별 DB 백업이 여기에 자동 생성됨
 ```
 
 > **주의:** OneDrive, 네트워크 드라이브(\\server\...) 경로는 DB 파일 잠금 오류가 발생할 수 있습니다.
@@ -228,14 +230,47 @@ Unregister-ScheduledTask -TaskName "영상의학과업무일지_서버" -Confirm
 
 모든 데이터는 `instance/worklog.db` 파일 하나에 저장됩니다.
 
-백업 방법:
+### 6-1. 자동 백업 (매일 08:00, 권장)
+
+`backup_db.py` 스크립트가 SQLite 온라인 백업 API를 사용하므로 **서버 실행 중에도 안전하게** 백업됩니다.
+- 백업 파일: `backups/worklog_YYYY-MM-DD.db` (30일 경과분은 자동 삭제, 스크립트의 `KEEP_DAYS`로 조정)
+- 실행 로그: `backups/backup.log`
+
+작업 스케줄러 등록 (PowerShell에서 1회 실행):
+```powershell
+$py = "C:\Program Files\Python313\pythonw.exe"   # 서버의 pythonw.exe 경로에 맞게 수정
+$script = "C:\radiology_worklog\backup_db.py"
+$action = New-ScheduledTaskAction -Execute $py -Argument "`"$script`""
+$trigger = New-ScheduledTaskTrigger -Daily -At 08:00
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable
+Register-ScheduledTask -TaskName "RadiologyWorklog_DB_Backup" -Action $action -Trigger $trigger -Settings $settings -Description "영상의학과 업무일지 worklog.db 매일 08:00 자동 백업"
+```
+
+동작 확인 / 삭제:
+```powershell
+# 즉시 1회 실행해서 테스트
+Start-ScheduledTask -TaskName "RadiologyWorklog_DB_Backup"
+
+# 마지막 실행 결과 및 다음 실행 시각 확인 (LastTaskResult가 0이면 정상)
+Get-ScheduledTaskInfo -TaskName "RadiologyWorklog_DB_Backup"
+
+# 작업 삭제
+Unregister-ScheduledTask -TaskName "RadiologyWorklog_DB_Backup"
+```
+
+> 작업은 등록한 사용자 계정으로 실행되므로 **로그온 상태에서만** 동작합니다. 로그아웃 상태에서도 실행하려면 `taskschd.msc`에서 해당 작업 속성 → "사용자의 로그온 여부에 관계없이 실행"으로 변경하세요(계정 암호 입력 필요). `-StartWhenAvailable` 옵션 덕분에 08:00에 PC가 꺼져 있었다면 켜진 후 놓친 백업이 자동 실행됩니다.
+
+### 6-2. 수동 백업
+
 ```cmd
 copy C:\radiology_worklog\instance\worklog.db D:\backup\worklog_백업날짜.db
 ```
+> 서버 실행 중에 복사하면 쓰기 도중인 데이터가 깨질 수 있으므로, 가급적 서버를 중지한 뒤 복사하거나 `python backup_db.py`를 실행하세요.
 
-복원 방법:
+### 6-3. 복원 방법
+
 1. 서버 서비스 중지 (작업 관리자에서 `pythonw.exe` 종료)
-2. `instance/worklog.db`를 백업 파일로 교체
+2. `instance/worklog.db`를 백업 파일(`backups/worklog_YYYY-MM-DD.db`)로 교체
 3. 서버 재시작
 
 ---

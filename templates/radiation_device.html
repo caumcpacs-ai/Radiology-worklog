@@ -2,7 +2,9 @@
 {% block page_title %}진단용방사선발생장치현황{% endblock %}
 {% block content %}
 <style>
-.eq-table th{background:#f0f4ff;font-size:12px;padding:7px 8px;white-space:nowrap}
+.eq-table th{background:#f0f4ff;font-size:12px;padding:7px 8px;white-space:nowrap;user-select:none}
+.eq-table th.sortable{cursor:pointer}
+.eq-table th.sortable:hover{background:#dde8ff}
 .eq-table td{padding:7px 8px;vertical-align:middle;font-size:12px}
 .eq-toolbar{display:flex;justify-content:flex-end;margin-bottom:10px}
 .btn-group{display:flex;gap:4px;flex-wrap:wrap}
@@ -27,17 +29,18 @@
     <thead>
       <tr>
         <th>No</th>
-        <th>코드</th>
-        <th>위치</th>
-        <th>용도</th>
-        <th>형식</th>
-        <th>모델명</th>
-        <th>제조일</th>
-        <th>제조번호</th>
-        <th>제조국</th>
-        <th>제조사</th>
-        <th>최초사용신고일</th>
-        <th>비고</th>
+        <th class="sortable" onclick="sortTable(1)">코드 <span class="sort-icon" id="sort-1"></span></th>
+        <th class="sortable" onclick="sortTable(2)">위치 <span class="sort-icon" id="sort-2"></span></th>
+        <th class="sortable" onclick="sortTable(3)">용도 <span class="sort-icon" id="sort-3"></span></th>
+        <th class="sortable" onclick="sortTable(4)">형식 <span class="sort-icon" id="sort-4"></span></th>
+        <th class="sortable" onclick="sortTable(5)">모델명 <span class="sort-icon" id="sort-5"></span></th>
+        <th class="sortable" onclick="sortTable(6)">제조일 <span class="sort-icon" id="sort-6"></span></th>
+        <th class="sortable" onclick="sortTable(7)">제조번호 <span class="sort-icon" id="sort-7"></span></th>
+        <th class="sortable" onclick="sortTable(8)">제조국 <span class="sort-icon" id="sort-8"></span></th>
+        <th class="sortable" onclick="sortTable(9)">제조사 <span class="sort-icon" id="sort-9"></span></th>
+        <th class="sortable" onclick="sortTable(10)">최초사용신고일 <span class="sort-icon" id="sort-10"></span></th>
+        <th class="sortable" onclick="sortTable(11)">비고 <span class="sort-icon" id="sort-11"></span></th>
+        <th>증명서(PDF)</th>
         <th>관리</th>
       </tr>
     </thead>
@@ -57,6 +60,11 @@
       <td style="font-size:11px">{{ rd.first_use_date }}</td>
       <td style="color:#666;font-size:11px">{{ rd.note }}</td>
       <td>
+        <button class="btn btn-sm btn-info" onclick="openFilesModal({{ rd.id }}, '{{ rd.model_name|e }}')">
+          📎 {{ rd.file_count }}건
+        </button>
+      </td>
+      <td>
         <div class="btn-group">
           <button class="btn btn-sm btn-warning"
             onclick="openRdEditModal({{ rd.id }},
@@ -72,7 +80,7 @@
       </td>
     </tr>
     {% else %}
-    <tr><td colspan="13" style="text-align:center;color:#aaa;padding:24px">등록된 장치가 없습니다.</td></tr>
+    <tr><td colspan="14" style="text-align:center;color:#aaa;padding:24px">등록된 장치가 없습니다.</td></tr>
     {% endfor %}
     </tbody>
   </table>
@@ -147,7 +155,107 @@
   </div>
 </div>
 
+<!-- PDF 첨부파일 모달 -->
+<div class="eq-modal-bg" id="filesModal">
+  <div class="eq-modal" style="width:620px">
+    <h3 id="filesModalTitle">증명서 파일</h3>
+    <form id="uploadForm" onsubmit="return uploadFile(event)" style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
+      <input type="file" name="pdf_file" id="pdfFileInput" accept="application/pdf" multiple style="flex:1">
+      <button type="submit" class="btn btn-primary btn-sm" id="uploadBtn">업로드</button>
+    </form>
+    <div id="filesList" style="border-top:1px solid #eee">
+      <div style="text-align:center;color:#aaa;padding:20px">불러오는 중...</div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeFilesModal()">닫기</button>
+    </div>
+  </div>
+</div>
+
 <script>
+var filesCtx = { type: 'radiation-device', id: null };
+
+function openFilesModal(id, name) {
+  filesCtx.id = id;
+  document.getElementById('filesModalTitle').textContent = name + ' - 증명서 파일';
+  document.getElementById('uploadForm').reset();
+  document.getElementById('filesModal').classList.add('open');
+  loadFiles();
+}
+
+function closeFilesModal() {
+  document.getElementById('filesModal').classList.remove('open');
+}
+
+function loadFiles() {
+  var list = document.getElementById('filesList');
+  list.innerHTML = '<div style="text-align:center;color:#aaa;padding:20px">불러오는 중...</div>';
+  fetch('/' + filesCtx.type + '/' + filesCtx.id + '/files')
+    .then(function(r){ return r.json(); })
+    .then(function(files){
+      if (!files.length) {
+        list.innerHTML = '<div style="text-align:center;color:#aaa;padding:20px">등록된 파일이 없습니다.</div>';
+        return;
+      }
+      list.innerHTML = files.map(function(f){
+        return '<div style="display:flex;align-items:center;gap:8px;padding:9px 4px;border-bottom:1px solid #f0f0f0">'
+          + '<span style="flex:1;cursor:pointer;color:#1a73e8;font-size:13px;word-break:break-all" '
+          + 'onclick="window.open(\'/' + filesCtx.type + '/file/' + f.id + '/view\',\'_blank\')">📄 '
+          + escapeHtml(f.original_name) + '</span>'
+          + '<span style="font-size:11px;color:#999;white-space:nowrap">' + (f.uploaded_by||'') + ' ' + (f.uploaded_at||'') + '</span>'
+          + '<button class="btn btn-sm btn-danger" onclick="deleteFile(' + f.id + ')">삭제</button>'
+          + '</div>';
+      }).join('');
+    });
+}
+
+function uploadFile(e) {
+  e.preventDefault();
+  var input = document.getElementById('pdfFileInput');
+  var files = Array.from(input.files);
+  if (!files.length) return false;
+  var btn = document.getElementById('uploadBtn');
+  btn.disabled = true;
+  btn.textContent = '업로드 중...';
+  var errors = [];
+  var uploadNext = function(idx) {
+    if (idx >= files.length) {
+      btn.disabled = false;
+      btn.textContent = '업로드';
+      document.getElementById('uploadForm').reset();
+      loadFiles();
+      if (errors.length) alert('업로드 실패:\n' + errors.join('\n'));
+      return;
+    }
+    var fd = new FormData();
+    fd.append('pdf_file', files[idx]);
+    fetch('/' + filesCtx.type + '/' + filesCtx.id + '/upload', { method:'POST', body: fd })
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        if (!res.ok) errors.push(files[idx].name + ': ' + (res.error || '업로드 실패'));
+        uploadNext(idx + 1);
+      })
+      .catch(function(){ errors.push(files[idx].name + ': 업로드 실패'); uploadNext(idx + 1); });
+  };
+  uploadNext(0);
+  return false;
+}
+
+function deleteFile(fid) {
+  if (!confirm('이 파일을 삭제하시겠습니까?')) return;
+  fetch('/' + filesCtx.type + '/file/' + fid + '/delete', { method:'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(){ loadFiles(); });
+}
+
+function escapeHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+document.getElementById('filesModal').addEventListener('click', function(e){
+  if (e.target === this) closeFilesModal();
+});
+
 function openRdModal() {
   document.getElementById('rdModalTitle').textContent = '진단용방사선발생장치 신규 추가';
   document.getElementById('rdForm').action = '/radiation-device/add';
@@ -183,5 +291,30 @@ function closeRdModal() {
 document.getElementById('rdModal').addEventListener('click', function(e) {
   if (e.target === this) closeRdModal();
 });
+
+var rdSortState = {col: -1, asc: true};
+function sortTable(colIdx) {
+  var tbody = document.querySelector('.eq-table tbody');
+  var rows = Array.from(tbody.querySelectorAll('tr'));
+  if (rows.length === 1 && rows[0].cells.length === 1) return;
+  if (rdSortState.col === colIdx) {
+    rdSortState.asc = !rdSortState.asc;
+  } else {
+    rdSortState.col = colIdx;
+    rdSortState.asc = true;
+  }
+  rows.sort(function(a, b) {
+    var ta = a.cells[colIdx] ? a.cells[colIdx].textContent.trim() : '';
+    var tb = b.cells[colIdx] ? b.cells[colIdx].textContent.trim() : '';
+    return rdSortState.asc ? ta.localeCompare(tb, 'ko') : tb.localeCompare(ta, 'ko');
+  });
+  rows.forEach(function(r, i) {
+    tbody.appendChild(r);
+    if (r.cells[0]) r.cells[0].textContent = i + 1;
+  });
+  document.querySelectorAll('.sort-icon').forEach(function(s) { s.textContent = ''; });
+  var icon = document.getElementById('sort-' + colIdx);
+  if (icon) icon.textContent = rdSortState.asc ? ' ▲' : ' ▼';
+}
 </script>
 {% endblock %}

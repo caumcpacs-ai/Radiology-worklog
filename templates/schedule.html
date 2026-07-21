@@ -1,0 +1,598 @@
+{% extends "base.html" %}
+{% block page_title %}일정관리{% endblock %}
+{% block content %}
+<style>
+.cal-container {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 6px rgba(0,0,0,.08);
+  padding: 20px;
+}
+/* 캘린더 컨트롤 헤더 */
+.cal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.cal-nav-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e2a3a;
+  margin-left: 12px;
+  min-width: 120px;
+}
+.cal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* 캘린더 그리드 */
+.cal-grid {
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+  text-align: center;
+}
+.cal-weekday {
+  padding: 10px 0;
+  font-weight: 700;
+  font-size: 12px;
+  color: #555;
+}
+.cal-weekday.sunday { color: #d93025; }
+.cal-weekday.saturday { color: #1a73e8; }
+
+.cal-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: repeat(6, 120px);
+  background: #e0e0e0;
+  gap: 1px;
+}
+.cal-day {
+  background: #fff;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.cal-day:hover {
+  background: #fcfdfe;
+}
+.cal-day.other-month {
+  background: #fafafa;
+}
+.cal-day.other-month .day-num {
+  color: #bbb;
+}
+.day-num {
+  font-size: 12px;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 4px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cal-day.today-cell .day-num {
+  background: #1a73e8;
+  color: #fff;
+  border-radius: 50%;
+}
+.day-events {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.day-events::-webkit-scrollbar {
+  width: 3px;
+}
+.day-events::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 2px;
+}
+
+/* 일정 이벤트 배지 */
+.event-badge {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  font-weight: 600;
+  border-left: 3px solid rgba(0,0,0,0.15);
+}
+.event-badge:hover {
+  filter: brightness(0.9);
+}
+
+/* 모달 공통 스타일 */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+.modal-content {
+  background: #fff;
+  border-radius: 8px;
+  width: 420px;
+  max-width: 90%;
+  box-shadow: 0 4px 20px rgba(0,0,0,.15);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.modal-header {
+  padding: 16px 20px;
+  background: #1e2a3a;
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.modal-close {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+}
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+}
+.modal-footer {
+  padding: 12px 20px;
+  background: #f8f9fa;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.color-picker {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+.color-option {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.color-option.selected {
+  border-color: #333;
+}
+.color-option span {
+  display: none;
+  color: #fff;
+  font-size: 12px;
+}
+.color-option.selected span {
+  display: block;
+}
+</style>
+
+<div class="cal-container">
+  <!-- 캘린더 상단 조작부 -->
+  <div class="cal-header">
+    <div class="cal-nav-group">
+      <button class="btn btn-secondary btn-sm" onclick="goToday()">오늘</button>
+      <button class="btn btn-secondary btn-sm" onclick="moveMonth(-1)">&lt;</button>
+      <button class="btn btn-secondary btn-sm" onclick="moveMonth(1)">&gt;</button>
+      <span class="cal-title" id="calTitle">2026년 6월</span>
+    </div>
+    <div class="cal-actions">
+      <button class="btn btn-primary btn-sm" onclick="openAddModal(null)">📅 일정 추가</button>
+      <a href="/api/schedules/export" class="btn btn-secondary btn-sm">📤 ICS 내보내기</a>
+      <button class="btn btn-secondary btn-sm" onclick="openImportModal()">📥 ICS 가져오기</button>
+    </div>
+  </div>
+
+  <!-- 캘린더 그리드 -->
+  <div class="cal-grid">
+    <div class="cal-weekdays">
+      <div class="cal-weekday sunday">일요일</div>
+      <div class="cal-weekday">월요일</div>
+      <div class="cal-weekday">화요일</div>
+      <div class="cal-weekday">수요일</div>
+      <div class="cal-weekday">목요일</div>
+      <div class="cal-weekday">금요일</div>
+      <div class="cal-weekday saturday">토요일</div>
+    </div>
+    <div class="cal-days" id="calDays">
+      <!-- JS가 여기에 날짜 카드들을 생성 -->
+    </div>
+  </div>
+</div>
+
+<!-- 일정 추가/수정 모달 -->
+<div class="modal-overlay" id="scheduleModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <span id="modalTitle">일정 추가</span>
+      <button class="modal-close" onclick="closeModal('scheduleModal')">&times;</button>
+    </div>
+    <form id="scheduleForm" onsubmit="saveSchedule(event)">
+      <input type="hidden" name="id" id="event_id">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>일정 제목 <span style="color:#d93025">*</span></label>
+          <input type="text" name="title" id="event_title" required placeholder="일정 제목을 입력하세요">
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label>시작일 <span style="color:#d93025">*</span></label>
+            <input type="date" name="start_date" id="event_start_date" required>
+          </div>
+          <div class="form-group">
+            <label>종료일 <span style="color:#d93025">*</span></label>
+            <input type="date" name="end_date" id="event_end_date" required>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label>시작 시간</label>
+            <input type="time" name="start_time" id="event_start_time">
+          </div>
+          <div class="form-group">
+            <label>종료 시간</label>
+            <input type="time" name="end_time" id="event_end_time">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>테마 색상</label>
+          <div class="color-picker" id="colorPicker">
+            <div class="color-option" data-color="#1a73e8" style="background:#1a73e8"><span>✓</span></div>
+            <div class="color-option" data-color="#34a853" style="background:#34a853"><span>✓</span></div>
+            <div class="color-option" data-color="#ea4335" style="background:#ea4335"><span>✓</span></div>
+            <div class="color-option" data-color="#fbbc05" style="background:#fbbc05"><span>✓</span></div>
+            <div class="color-option" data-color="#9c27b0" style="background:#9c27b0"><span>✓</span></div>
+            <div class="color-option" data-color="#009688" style="background:#009688"><span>✓</span></div>
+          </div>
+          <input type="hidden" name="color" id="event_color" value="#1a73e8">
+        </div>
+        <div class="form-group">
+          <label>상세 내용</label>
+          <textarea name="content" id="event_content" placeholder="상세 정보를 입력하세요"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" id="deleteBtn" style="margin-right:auto;display:none" onclick="deleteSchedule()">삭제</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('scheduleModal')">취소</button>
+        <button type="submit" class="btn btn-primary">저장</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ICS 가져오기 모달 -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <span>ICS 캘린더 가져오기</span>
+      <button class="modal-close" onclick="closeModal('importModal')">&times;</button>
+    </div>
+    <form action="/api/schedules/import" method="post" enctype="multipart/form-data">
+      <div class="modal-body">
+        <p style="font-size:12px;color:#666;margin-bottom:12px">
+          외부 캘린더(아웃룩, 구글 캘린더 등)에서 내보낸 표준 <code>.ics</code> 확장자 파일을 선택하여 일정을 가져올 수 있습니다.
+        </p>
+        <div class="form-group">
+          <label>ICS 파일 선택</label>
+          <input type="file" name="file" accept=".ics" required style="padding:4px">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('importModal')">취소</button>
+        <button type="submit" class="btn btn-primary">가져오기</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+let currentYear, currentMonth;
+let allSchedules = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+  const d = new Date();
+  currentYear = d.getFullYear();
+  currentMonth = d.getMonth(); // 0-indexed
+
+  // Color picker event listener
+  document.querySelectorAll('.color-option').forEach(opt => {
+    opt.addEventListener('click', function() {
+      document.querySelectorAll('.color-option').forEach(o => o.classList.remove('selected'));
+      this.classList.add('selected');
+      document.getElementById('event_color').value = this.dataset.color;
+    });
+  });
+
+  fetchSchedules();
+});
+
+// 일정 DB 조회
+function fetchSchedules() {
+  fetch('/api/schedules')
+    .then(res => res.json())
+    .then(data => {
+      allSchedules = data;
+      renderCalendar();
+    })
+    .catch(err => console.error("Error loading schedules:", err));
+}
+
+// 캘린더 그리기
+function renderCalendar() {
+  const calTitle = document.getElementById('calTitle');
+  calTitle.textContent = `${currentYear}년 ${currentMonth + 1}월`;
+
+  const calDays = document.getElementById('calDays');
+  calDays.innerHTML = '';
+
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay(); // 시작 요일 (0: 일, 6: 토)
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate(); // 현재 달 일수
+  const daysInPrevMonth = new Date(currentYear, currentMonth, 0).getDate(); // 이전 달 일수
+
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+  // 1. 이전 달 날짜들 (padding)
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const day = daysInPrevMonth - i;
+    const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+    const dateStr = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    
+    createDayCell(day, dateStr, true, calDays, todayStr);
+  }
+
+  // 2. 현재 달 날짜들
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    createDayCell(day, dateStr, false, calDays, todayStr);
+  }
+
+  // 3. 다음 달 날짜들 (padding)
+  const totalCells = calDays.children.length;
+  const remainingCells = 42 - totalCells; // 6주(42칸) 고정 채우기
+  for (let day = 1; day <= remainingCells; day++) {
+    const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+    const nextYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+    const dateStr = `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    
+    createDayCell(day, dateStr, true, calDays, todayStr);
+  }
+}
+
+// 개별 일자 카드 엘리먼트 생성
+function createDayCell(dayNum, dateStr, isOtherMonth, container, todayStr) {
+  const cell = document.createElement('div');
+  cell.className = 'cal-day';
+  if (isOtherMonth) cell.classList.add('other-month');
+  if (dateStr === todayStr) cell.classList.add('today-cell');
+  cell.dataset.date = dateStr;
+
+  cell.innerHTML = `
+    <div class="day-num">${dayNum}</div>
+    <div class="day-events"></div>
+  `;
+
+  // 셀 클릭 이벤트 (배지 외 영역 클릭 시 일정 추가)
+  cell.addEventListener('click', function(e) {
+    if (e.target.classList.contains('event-badge')) return;
+    openAddModal(dateStr);
+  });
+
+  // 해당 일자 스케줄 검색 및 렌더링
+  const eventsContainer = cell.querySelector('.day-events');
+  const dayEvents = allSchedules.filter(s => {
+    // 일정이 해당 날짜 범위를 포함하는지 확인 (start_date <= dateStr <= end_date)
+    return s.start_date <= dateStr && dateStr <= s.end_date;
+  });
+
+  dayEvents.forEach(evt => {
+    const badge = document.createElement('div');
+    badge.className = 'event-badge';
+    badge.style.background = evt.color || '#1a73e8';
+    
+    // 시간 정보 포맷팅
+    let timeText = '';
+    if (evt.start_time) {
+      timeText = formatTime(evt.start_time) + ' ';
+    }
+    badge.textContent = timeText + evt.title;
+    badge.title = `${timeText}${evt.title}\n${evt.content || ''}`;
+
+    badge.addEventListener('click', function(e) {
+      e.stopPropagation();
+      openEditModal(evt);
+    });
+
+    eventsContainer.appendChild(badge);
+  });
+
+  container.appendChild(cell);
+}
+
+// 시간 정보 한국어 변환 (HH:MM -> 오전/오후 H:MM)
+function formatTime(hhmm) {
+  if (!hhmm) return '';
+  const [hStr, mStr] = hhmm.split(':');
+  const h = parseInt(hStr);
+  const ampm = h >= 12 ? '오후' : '오전';
+  const displayH = h % 12 === 0 ? 12 : h % 12;
+  return `${ampm} ${displayH}:${mStr}`;
+}
+
+// 오늘로 이동
+function goToday() {
+  const d = new Date();
+  currentYear = d.getFullYear();
+  currentMonth = d.getMonth();
+  renderCalendar();
+}
+
+// 달 이동
+function moveMonth(offset) {
+  currentMonth += offset;
+  if (currentMonth < 0) {
+    currentMonth = 11;
+    currentYear--;
+  } else if (currentMonth > 11) {
+    currentMonth = 0;
+    currentYear++;
+  }
+  renderCalendar();
+}
+
+// 모달 닫기
+function closeModal(modalId) {
+  document.getElementById(modalId).style.display = 'none';
+}
+
+// 일정 추가 모달 열기
+function openAddModal(selectedDate) {
+  const today = new Date().toISOString().split('T')[0];
+  const dateVal = selectedDate || today;
+
+  document.getElementById('modalTitle').textContent = '일정 추가';
+  document.getElementById('event_id').value = '';
+  document.getElementById('event_title').value = '';
+  document.getElementById('event_start_date').value = dateVal;
+  document.getElementById('event_end_date').value = dateVal;
+  document.getElementById('event_start_time').value = '';
+  document.getElementById('event_end_time').value = '';
+  document.getElementById('event_content').value = '';
+  
+  // 기본 파랑 색상 선택
+  setSelectedColor('#1a73e8');
+
+  document.getElementById('deleteBtn').style.display = 'none';
+  document.getElementById('scheduleModal').style.display = 'flex';
+}
+
+// 일정 수정 모달 열기
+function openEditModal(evt) {
+  document.getElementById('modalTitle').textContent = '일정 상세/수정';
+  document.getElementById('event_id').value = evt.id;
+  document.getElementById('event_title').value = evt.title;
+  document.getElementById('event_start_date').value = evt.start_date;
+  document.getElementById('event_end_date').value = evt.end_date;
+  document.getElementById('event_start_time').value = evt.start_time || '';
+  document.getElementById('event_end_time').value = evt.end_time || '';
+  document.getElementById('event_content').value = evt.content || '';
+  
+  setSelectedColor(evt.color || '#1a73e8');
+
+  document.getElementById('deleteBtn').style.display = 'block';
+  document.getElementById('scheduleModal').style.display = 'flex';
+}
+
+// 캘린더 가져오기 모달 열기
+function openImportModal() {
+  document.getElementById('importModal').style.display = 'flex';
+}
+
+// 모달 테마 색상 동기화
+function setSelectedColor(colorHex) {
+  document.getElementById('event_color').value = colorHex;
+  document.querySelectorAll('.color-option').forEach(opt => {
+    if (opt.dataset.color === colorHex) {
+      opt.classList.add('selected');
+    } else {
+      opt.classList.remove('selected');
+    }
+  });
+}
+
+// 일정 저장 (추가/수정 API)
+function saveSchedule(e) {
+  e.preventDefault();
+  const form = document.getElementById('scheduleForm');
+  const formData = new FormData(form);
+  const eventId = document.getElementById('event_id').value;
+
+  const url = eventId ? `/api/schedules/edit/${eventId}` : '/api/schedules/add';
+
+  fetch(url, {
+    method: 'POST',
+    body: formData
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      closeModal('scheduleModal');
+      fetchSchedules();
+    } else {
+      alert("오류: " + data.message);
+    }
+  })
+  .catch(err => {
+    console.error("Error saving schedule:", err);
+    alert("서버 연결에 실패했습니다.");
+  });
+}
+
+// 일정 삭제 API
+function deleteSchedule() {
+  const eventId = document.getElementById('event_id').value;
+  if (!eventId) return;
+
+  if (!confirm("이 일정을 삭제하시겠습니까?")) return;
+
+  fetch(`/api/schedules/delete/${eventId}`, {
+    method: 'POST'
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      closeModal('scheduleModal');
+      fetchSchedules();
+    } else {
+      alert("오류: " + data.message);
+    }
+  })
+  .catch(err => {
+    console.error("Error deleting schedule:", err);
+    alert("서버 연결에 실패했습니다.");
+  });
+}
+</script>
+{% endblock %}

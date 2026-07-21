@@ -2,10 +2,11 @@
 영상의학과 업무일지 웹앱
 Flask + SQLite 기반 내부망 전용
 """
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_from_directory, abort
 from datetime import datetime, date, timedelta
 import sqlite3
 import os
+import uuid
 import hashlib
 import logging
 from logging.handlers import TimedRotatingFileHandler
@@ -44,8 +45,15 @@ def inject_now():
 DB_PATH          = os.path.join(os.path.dirname(__file__), 'instance', 'worklog.db')
 SPECIAL_EQ_DB    = os.path.join(os.path.dirname(__file__), 'instance', 'special_equipment.db')
 RADIATION_DB     = os.path.join(os.path.dirname(__file__), 'instance', 'radiation_device.db')
+CALENDAR_DB      = os.path.join(os.path.dirname(__file__), 'instance', 'calendar.db')
+MAINTENANCE_DB   = os.path.join(os.path.dirname(__file__), 'instance', 'maintenance.db')
 
-PARTS = ['GR', 'CT', 'MR', '인터벤션', '간호']
+# PDF 첨부파일 저장 경로
+UPLOAD_ROOT      = os.path.join(os.path.dirname(__file__), 'instance', 'uploads')
+SPECIAL_EQ_UPLOAD = os.path.join(UPLOAD_ROOT, 'special_equipment')
+RADIATION_UPLOAD  = os.path.join(UPLOAD_ROOT, 'radiation_device')
+
+PARTS = ['GR', 'CT', 'MR', '인터벤션', '간호', '기타']
 
 def _calc_hours(t1: str, t2: str) -> float:
     """HH:MM 두 시각의 차이(시간)를 반환. t2 < t1이면 익일로 간주."""
@@ -108,6 +116,40 @@ def get_radiation_db():
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     return conn
+
+
+def get_calendar_db():
+    conn = sqlite3.connect(CALENDAR_DB, timeout=30, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    return conn
+
+
+def get_maintenance_db():
+    conn = sqlite3.connect(MAINTENANCE_DB, timeout=30, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    return conn
+
+
+def init_calendar_db():
+    os.makedirs(os.path.dirname(CALENDAR_DB), exist_ok=True)
+    conn = get_calendar_db()
+    c = conn.cursor()
+    c.execute("PRAGMA journal_mode=WAL")
+    c.execute('''CREATE TABLE IF NOT EXISTS schedules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL,
+        start_time TEXT DEFAULT '',
+        end_time TEXT DEFAULT '',
+        content TEXT DEFAULT '',
+        color TEXT DEFAULT '#1a73e8',
+        created_at TEXT DEFAULT (datetime('now','localtime'))
+    )''')
+    conn.commit()
+    conn.close()
 
 
 def init_db():
@@ -231,6 +273,7 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS issues (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         date TEXT NOT NULL,
+        record_type TEXT DEFAULT '특이사항',
         category TEXT NOT NULL,
         severity TEXT NOT NULL,
         title TEXT NOT NULL,
@@ -345,6 +388,16 @@ def init_db():
     except Exception:
         pass
 
+    # issues: record_type (특이사항/이슈) 신규 컬럼 추가
+    try:
+        c.execute("ALTER TABLE issues ADD COLUMN record_type TEXT DEFAULT '특이사항'")
+    except Exception:
+        pass
+    try:
+        c.execute("UPDATE issues SET record_type='특이사항' WHERE record_type IS NULL OR record_type=''")
+    except Exception:
+        pass
+
     # worklog_status: confirmed_by, confirmed_at
     for col in ['confirmed_by', 'confirmed_at']:
         try:
@@ -364,6 +417,7 @@ def init_db():
 def init_special_eq_db():
     """특수의료장비 전용 DB 초기화 (instance/special_equipment.db)"""
     os.makedirs(os.path.dirname(SPECIAL_EQ_DB), exist_ok=True)
+    os.makedirs(SPECIAL_EQ_UPLOAD, exist_ok=True)
     conn = get_special_eq_db()
     c = conn.cursor()
     c.execute("PRAGMA journal_mode=WAL")
@@ -378,6 +432,15 @@ def init_special_eq_db():
         radiographer2 TEXT DEFAULT '',
         note TEXT DEFAULT '',
         created_at TEXT DEFAULT (datetime('now','localtime'))
+    )''')
+    # 첨부 PDF 파일 (장비별 다건 누적)
+    c.execute('''CREATE TABLE IF NOT EXISTS special_equipment_files (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        equipment_id INTEGER NOT NULL,
+        original_name TEXT NOT NULL,
+        stored_name TEXT NOT NULL,
+        uploaded_by TEXT DEFAULT '',
+        uploaded_at TEXT DEFAULT (datetime('now','localtime'))
     )''')
     conn.commit()
 
@@ -403,6 +466,7 @@ def init_special_eq_db():
 def init_radiation_db():
     """진단용방사선발생장치 전용 DB 초기화 (instance/radiation_device.db)"""
     os.makedirs(os.path.dirname(RADIATION_DB), exist_ok=True)
+    os.makedirs(RADIATION_UPLOAD, exist_ok=True)
     conn = get_radiation_db()
     c = conn.cursor()
     c.execute("PRAGMA journal_mode=WAL")
@@ -420,6 +484,15 @@ def init_radiation_db():
         first_use_date TEXT DEFAULT '',
         note TEXT DEFAULT '',
         created_at TEXT DEFAULT (datetime('now','localtime'))
+    )''')
+    # 첨부 PDF 파일 (장치별 다건 누적)
+    c.execute('''CREATE TABLE IF NOT EXISTS radiation_device_files (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        device_id INTEGER NOT NULL,
+        original_name TEXT NOT NULL,
+        stored_name TEXT NOT NULL,
+        uploaded_by TEXT DEFAULT '',
+        uploaded_at TEXT DEFAULT (datetime('now','localtime'))
     )''')
     conn.commit()
 
@@ -441,6 +514,35 @@ def init_radiation_db():
             conn.commit()
         except Exception:
             pass
+    conn.close()
+
+
+def init_maintenance_db():
+    """장비 유지보수현황 전용 DB 초기화 (instance/maintenance.db)"""
+    os.makedirs(os.path.dirname(MAINTENANCE_DB), exist_ok=True)
+    conn = get_maintenance_db()
+    c = conn.cursor()
+    c.execute("PRAGMA journal_mode=WAL")
+    c.execute('''CREATE TABLE IF NOT EXISTS maintenance (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category TEXT DEFAULT '',
+        asset_code TEXT DEFAULT '',
+        model_name TEXT NOT NULL,
+        install_year TEXT DEFAULT '',
+        purchase_amount TEXT DEFAULT '',
+        vendor TEXT DEFAULT '',
+        contract_start TEXT DEFAULT '',
+        contract_end TEXT DEFAULT '',
+        contract_amount TEXT DEFAULT '',
+        pm_count TEXT DEFAULT '',
+        note TEXT DEFAULT '',
+        created_at TEXT DEFAULT (datetime('now','localtime'))
+    )''')
+    try:
+        c.execute("ALTER TABLE maintenance ADD COLUMN asset_code TEXT DEFAULT ''")
+    except Exception:
+        pass
+    conn.commit()
     conn.close()
 
 
@@ -547,74 +649,111 @@ def profile_save():
 @app.route('/')
 @login_required
 def dashboard():
-    today = date.today().isoformat()
-    d1 = (date.today() - timedelta(days=1)).isoformat()
-    d2 = (date.today() - timedelta(days=2)).isoformat()
     conn = get_db()
+    cal_conn = get_calendar_db()
+    
+    # 캘린더 기준일(Base Date) 파싱 (기본값: 오늘)
+    base_date_str = request.args.get('date')
+    if base_date_str:
+        try:
+            base_date = datetime.strptime(base_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            base_date = date.today()
+    else:
+        base_date = date.today()
 
-    # 오늘 현황 (섹션 테이블용)
-    roster_today    = conn.execute("SELECT * FROM staff_roster WHERE date=? ORDER BY shift, part, id", (today,)).fetchall()
-    vacation_today  = conn.execute("SELECT * FROM vacation WHERE date=? ORDER BY part, vacation_code, staff_name", (today,)).fetchall()
-    oncall_today    = conn.execute("SELECT * FROM oncall WHERE date=? ORDER BY part", (today,)).fetchall()
-    overtime_today  = conn.execute("SELECT * FROM overtime WHERE date=? ORDER BY part, staff_name", (today,)).fetchall()
-    equipment_today = conn.execute("SELECT * FROM equipment_log WHERE date=? ORDER BY equipment_name", (today,)).fetchall()
-    issues_today    = conn.execute("SELECT * FROM issues WHERE date=? ORDER BY severity, id", (today,)).fetchall()
+    days_data = []
+    shift_order = {'야간': 0, '오전': 1, '종일': 2}
 
-    # D-1 현황
-    vacation_d1  = conn.execute("SELECT * FROM vacation WHERE date=? ORDER BY part, vacation_code, staff_name", (d1,)).fetchall()
-    oncall_d1    = conn.execute("SELECT * FROM oncall WHERE date=? ORDER BY part", (d1,)).fetchall()
-    overtime_d1  = conn.execute("SELECT * FROM overtime WHERE date=? ORDER BY part, staff_name", (d1,)).fetchall()
-    equipment_d1 = conn.execute("SELECT * FROM equipment_log WHERE date=? ORDER BY equipment_name", (d1,)).fetchall()
-    issues_d1    = conn.execute("SELECT * FROM issues WHERE date=? ORDER BY severity, id", (d1,)).fetchall()
+    # 오늘(기준일)부터 D-7 (7일 전)까지 총 8일 조회
+    for i in range(8):
+        dt = (base_date - timedelta(days=i)).isoformat()
 
-    # D-2 현황
-    vacation_d2  = conn.execute("SELECT * FROM vacation WHERE date=? ORDER BY part, vacation_code, staff_name", (d2,)).fetchall()
-    oncall_d2    = conn.execute("SELECT * FROM oncall WHERE date=? ORDER BY part", (d2,)).fetchall()
-    overtime_d2  = conn.execute("SELECT * FROM overtime WHERE date=? ORDER BY part, staff_name", (d2,)).fetchall()
-    equipment_d2 = conn.execute("SELECT * FROM equipment_log WHERE date=? ORDER BY equipment_name", (d2,)).fetchall()
-    issues_d2    = conn.execute("SELECT * FROM issues WHERE date=? ORDER BY severity, id", (d2,)).fetchall()
+        # 1. 근무자 현황 조회 및 그룹화
+        roster_rows = conn.execute("SELECT * FROM staff_roster WHERE date=? ORDER BY shift, part, id", (dt,)).fetchall()
+        roster_grouped = {}
+        for r in roster_rows:
+            key = (r['shift'], r['part'])
+            roster_grouped.setdefault(key, []).append(r['staff_name'])
+        roster_grouped_sorted = sorted(roster_grouped.items(), key=lambda x: (shift_order.get(x[0][0], 9), x[0][1]))
 
-    issues_open_rows  = conn.execute("SELECT * FROM issues WHERE status='진행중' ORDER BY severity, date DESC LIMIT 10").fetchall()
-    equip_active_rows = conn.execute("SELECT * FROM equipment_log WHERE status='처리중' ORDER BY date DESC LIMIT 10").fetchall()
+        # 2. 휴가 현황 조회
+        vacation = conn.execute("SELECT * FROM vacation WHERE date=? ORDER BY part, vacation_code, staff_name", (dt,)).fetchall()
 
-    # D-1 근무자 현황
-    roster_d1 = conn.execute("SELECT * FROM staff_roster WHERE date=? ORDER BY shift, part, id", (d1,)).fetchall()
+        # 3. On-call 현황 조회
+        oncall = conn.execute("SELECT * FROM oncall WHERE date=? ORDER BY part", (dt,)).fetchall()
+
+        # 4. 연장근무 현황 조회
+        overtime = conn.execute("SELECT * FROM overtime WHERE date=? ORDER BY part, staff_name", (dt,)).fetchall()
+
+        # 5. 장비 이력 조회
+        equipment = conn.execute("SELECT * FROM equipment_log WHERE date=? ORDER BY equipment_name", (dt,)).fetchall()
+
+        # 6. 특이사항·이슈 조회
+        issues = conn.execute("SELECT * FROM issues WHERE date=? ORDER BY severity, id", (dt,)).fetchall()
+
+        # 7. 야간 체크리스트 조회 및 매핑
+        checklist_saved = conn.execute("SELECT * FROM night_checklist WHERE date=? ORDER BY item_no", (dt,)).fetchall()
+        checklist_map = {r['item_no']: r for r in checklist_saved}
+        night_checklist = []
+        for _item in NIGHT_CHECKLIST_ITEMS:
+            _saved = checklist_map.get(_item['no'])
+            night_checklist.append({
+                'no':           _item['no'],
+                'name':         _item['name'],
+                'door_lock':    _saved['door_lock']    if _saved else '-',
+                'light_off':    _saved['light_off']    if _saved else '-',
+                'hvac':         _saved['hvac']         if _saved else '-',
+                'remark':       _saved['remark']       if _saved else _item['default_remark'],
+                'check_result': _saved['check_result'] if _saved else '-',
+            })
+
+        # 8. 제출 상태 조회
+        ws = conn.execute("SELECT status FROM worklog_status WHERE date=?", (dt,)).fetchone()
+        status = ws['status'] if ws else None
+
+        status_class_map = {
+            '제출': 'info',
+            '확정': 'success',
+            '반려': 'danger',
+            '저장': 'secondary',
+            '회수': 'warning'
+        }
+        status_class = status_class_map.get(status, 'secondary') if status else 'secondary'
+
+        # 9. 한국어 요일 계산
+        dt_obj = datetime.strptime(dt, '%Y-%m-%d')
+        korean_weekdays = ['월', '화', '수', '목', '금', '토', '일']
+        weekday = korean_weekdays[dt_obj.weekday()]
+
+        # 10. 일정 조회 (calendar.db)
+        schedules_rows = cal_conn.execute(
+            "SELECT title, start_time, end_time FROM schedules WHERE start_date <= ? AND ? <= end_date ORDER BY start_time, id",
+            (dt, dt)
+        ).fetchall()
+        schedules = [dict(r) for r in schedules_rows]
+
+        days_data.append({
+            'index': i,
+            'label': '오늘' if i == 0 else f'D-{i}',
+            'date_str': dt,
+            'weekday': weekday,
+            'status': status,
+            'status_class': status_class,
+            'roster_grouped': roster_grouped_sorted,
+            'vacation': vacation,
+            'oncall': oncall,
+            'overtime': overtime,
+            'equipment': equipment,
+            'issues': issues,
+            'night_checklist': night_checklist,
+            'schedules': schedules
+        })
 
     conn.close()
+    cal_conn.close()
 
-    # 근무자 현황: shift+part 그룹화 (오늘)
-    roster_grouped = {}
-    shift_order = {'야간': 0, '오전': 1, '종일': 2}
-    for r in roster_today:
-        key = (r['shift'], r['part'])
-        roster_grouped.setdefault(key, []).append(r['staff_name'])
-    roster_grouped_sorted = sorted(roster_grouped.items(), key=lambda x: (shift_order.get(x[0][0], 9), x[0][1]))
-
-    # 근무자 현황: shift+part 그룹화 (D-1)
-    roster_grouped_d1 = {}
-    for r in roster_d1:
-        key = (r['shift'], r['part'])
-        roster_grouped_d1.setdefault(key, []).append(r['staff_name'])
-    roster_grouped_sorted_d1 = sorted(roster_grouped_d1.items(), key=lambda x: (shift_order.get(x[0][0], 9), x[0][1]))
-
-    return render_template('dashboard.html',
-        today=today, d1=d1, d2=d2,
-        roster_grouped=roster_grouped_sorted,
-        roster_grouped_d1=roster_grouped_sorted_d1,
-        roster_today=roster_today,
-        vacation_today=vacation_today,
-        oncall_today=oncall_today,
-        overtime_today=overtime_today,
-        equipment_today=equipment_today,
-        issues_today=issues_today,
-        issues_open_rows=issues_open_rows,
-        equip_active_rows=equip_active_rows,
-        vacation_d1=vacation_d1, vacation_d2=vacation_d2,
-        oncall_d1=oncall_d1, oncall_d2=oncall_d2,
-        overtime_d1=overtime_d1, overtime_d2=overtime_d2,
-        equipment_d1=equipment_d1, equipment_d2=equipment_d2,
-        issues_d1=issues_d1, issues_d2=issues_d2,
-        roster_d1=roster_d1)
+    return render_template('dashboard.html', days=days_data, base_date=base_date.isoformat())
 
 
 # ════════════════════════════════════════════════════
@@ -964,8 +1103,9 @@ def write_issue_add():
         return redirect(url_for('write', date=d))
     conn = get_db()
     try:
-        conn.execute("INSERT INTO issues (date,category,severity,title,content,status,author) VALUES (?,?,?,?,?,?,?)",
-            (d, request.form['category'], request.form['severity'],
+        conn.execute("INSERT INTO issues (date,record_type,category,severity,title,content,status,author) VALUES (?,?,?,?,?,?,?,?)",
+            (d, request.form.get('record_type', '특이사항'),
+             request.form['category'], request.form['severity'],
              request.form['title'], request.form['content'],
              request.form.get('status', '진행중'), session['name']))
         conn.commit()
@@ -984,8 +1124,8 @@ def write_issue_edit(id):
         conn.close()
         flash('제출된 상태에서는 수정이 불가합니다.', 'danger')
         return redirect(url_for('write', date=d))
-    conn.execute("UPDATE issues SET category=?,severity=?,title=?,content=?,status=? WHERE id=?",
-        (request.form['category'], request.form['severity'],
+    conn.execute("UPDATE issues SET record_type=?,category=?,severity=?,title=?,content=?,status=? WHERE id=?",
+        (request.form.get('record_type', '특이사항'), request.form['category'], request.form['severity'],
          request.form['title'], request.form['content'], request.form['status'], id))
     conn.commit(); conn.close()
     return redirect(url_for('write', date=d))
@@ -1258,11 +1398,15 @@ def oncall_list():
         "SELECT DISTINCT staff_name FROM oncall WHERE staff_name != ''"
     ).fetchall()}
     names = sorted(db_names | actual_names)
+
+    # 총 On-call 시간 합계
+    total_hours = sum(r['hours'] for r in rows if r['hours'])
+
     conn.close()
     return render_template('oncall_list.html',
                            rows=rows, names=names,
                            date_from=date_from, date_to=date_to,
-                           staff_name=staff_name)
+                           staff_name=staff_name, total_hours=total_hours)
 
 
 # ════════════════════════════════════════════════════
@@ -1309,16 +1453,104 @@ def overtime_list():
 
 
 # ════════════════════════════════════════════════════
+# 특이사항·이슈 리스트 페이지 (record_type 으로 분기)
+# ════════════════════════════════════════════════════
+def _issue_list(record_type, template):
+    date_from = request.args.get('date_from', '')
+    date_to   = request.args.get('date_to', '')
+    category  = request.args.get('category', '')
+    status    = request.args.get('status', '')
+
+    conn  = get_db()
+    query = "SELECT * FROM issues WHERE record_type=?"
+    params = [record_type]
+    if date_from:
+        query += " AND date >= ?"
+        params.append(date_from)
+    if date_to:
+        query += " AND date <= ?"
+        params.append(date_to)
+    if category:
+        query += " AND category = ?"
+        params.append(category)
+    if status:
+        query += " AND status = ?"
+        params.append(status)
+    query += " ORDER BY date DESC, id"
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+    return render_template(template,
+                           rows=rows,
+                           date_from=date_from, date_to=date_to,
+                           category=category, status=status)
+
+
+@app.route('/special-note-list')
+@login_required
+def special_note_list():
+    return _issue_list('특이사항', 'special_note_list.html')
+
+
+@app.route('/issue-list')
+@login_required
+def issue_list():
+    return _issue_list('이슈', 'issue_list.html')
+
+
+# ════════════════════════════════════════════════════
+# 장비 이력 리스트 페이지
+# ════════════════════════════════════════════════════
+@app.route('/equipment-history')
+@login_required
+def equipment_history_list():
+    date_from      = request.args.get('date_from', '')
+    date_to        = request.args.get('date_to', '')
+    equipment_name = request.args.get('equipment_name', '')
+
+    conn  = get_db()
+    query = "SELECT * FROM equipment_log WHERE 1=1"
+    params = []
+    if date_from:
+        query += " AND date >= ?"
+        params.append(date_from)
+    if date_to:
+        query += " AND date <= ?"
+        params.append(date_to)
+    if equipment_name:
+        query += " AND equipment_name = ?"
+        params.append(equipment_name)
+    query += " ORDER BY date DESC, id"
+    rows = conn.execute(query, params).fetchall()
+
+    equip_names = sorted({r['equipment_name'] for r in conn.execute(
+        "SELECT DISTINCT equipment_name FROM equipment_log WHERE equipment_name != ''"
+    ).fetchall()})
+    conn.close()
+    return render_template('equipment_history_list.html',
+                           rows=rows, equip_names=equip_names,
+                           date_from=date_from, date_to=date_to,
+                           equipment_name=equipment_name)
+
+
+# ════════════════════════════════════════════════════
 # 특수의료장비현황 페이지
 # ════════════════════════════════════════════════════
 @app.route('/special-equipment')
 @login_required
 def special_equipment_list():
     conn = get_special_eq_db()
-    special_equips = conn.execute(
+    rows = conn.execute(
         "SELECT * FROM special_equipment ORDER BY category, equipment_name"
     ).fetchall()
+    counts = dict(conn.execute(
+        "SELECT equipment_id, COUNT(*) FROM special_equipment_files GROUP BY equipment_id"
+    ).fetchall())
     conn.close()
+    special_equips = []
+    for r in rows:
+        d = dict(r)
+        d['file_count'] = counts.get(r['id'], 0)
+        special_equips.append(d)
     return render_template('special_equipment.html', special_equips=special_equips)
 
 
@@ -1329,10 +1561,18 @@ def special_equipment_list():
 @login_required
 def radiation_device_list():
     conn = get_radiation_db()
-    radiation_devs = conn.execute(
+    rows = conn.execute(
         "SELECT * FROM radiation_device ORDER BY id"
     ).fetchall()
+    counts = dict(conn.execute(
+        "SELECT device_id, COUNT(*) FROM radiation_device_files GROUP BY device_id"
+    ).fetchall())
     conn.close()
+    radiation_devs = []
+    for r in rows:
+        d = dict(r)
+        d['file_count'] = counts.get(r['id'], 0)
+        radiation_devs.append(d)
     return render_template('radiation_device.html', radiation_devs=radiation_devs)
 
 
@@ -1865,8 +2105,8 @@ def api_issue_add():
     if err: return err
     d = request.get_json()
     conn = get_db()
-    conn.execute("INSERT INTO issues (date,category,severity,title,content,status,author) VALUES (?,?,?,?,?,?,?)",
-        (d['date'], d['category'], d['severity'], d['title'], d['content'], d.get('status', '진행중'), session['name']))
+    conn.execute("INSERT INTO issues (date,record_type,category,severity,title,content,status,author) VALUES (?,?,?,?,?,?,?,?)",
+        (d['date'], d.get('record_type', '특이사항'), d['category'], d['severity'], d['title'], d['content'], d.get('status', '진행중'), session['name']))
     conn.commit(); conn.close()
     return jsonify({'ok': True})
 
@@ -1877,8 +2117,8 @@ def api_issue_edit(id):
     if err: return err
     d = request.get_json()
     conn = get_db()
-    conn.execute("UPDATE issues SET category=?,severity=?,title=?,content=?,status=? WHERE id=?",
-        (d['category'], d['severity'], d['title'], d['content'], d['status'], id))
+    conn.execute("UPDATE issues SET record_type=?,category=?,severity=?,title=?,content=?,status=? WHERE id=?",
+        (d.get('record_type', '특이사항'), d['category'], d['severity'], d['title'], d['content'], d['status'], id))
     conn.commit(); conn.close()
     return jsonify({'ok': True})
 
@@ -2135,10 +2375,149 @@ def special_equipment_edit(eid):
 @login_required
 def special_equipment_delete(eid):
     conn = get_special_eq_db()
+    # 첨부 PDF 파일도 함께 삭제
+    files = conn.execute("SELECT stored_name FROM special_equipment_files WHERE equipment_id=?", (eid,)).fetchall()
+    for f in files:
+        try:
+            os.remove(os.path.join(SPECIAL_EQ_UPLOAD, f['stored_name']))
+        except OSError:
+            pass
+    conn.execute("DELETE FROM special_equipment_files WHERE equipment_id=?", (eid,))
     conn.execute("DELETE FROM special_equipment WHERE id=?", (eid,))
     conn.commit()
     conn.close()
     return redirect(url_for('special_equipment_list'))
+
+
+# ── 특수의료장비 PDF 첨부파일 ──
+@app.route('/special-equipment/<int:eid>/files')
+@login_required
+def special_equipment_files(eid):
+    conn = get_special_eq_db()
+    rows = conn.execute(
+        "SELECT id, original_name, uploaded_by, uploaded_at FROM special_equipment_files WHERE equipment_id=? ORDER BY original_name DESC",
+        (eid,)).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route('/special-equipment/<int:eid>/upload', methods=['POST'])
+@login_required
+def special_equipment_upload(eid):
+    f = request.files.get('pdf_file')
+    if not f or not f.filename:
+        return jsonify({'ok': False, 'error': '파일이 없습니다.'}), 400
+    if not f.filename.lower().endswith('.pdf'):
+        return jsonify({'ok': False, 'error': 'PDF 파일만 업로드할 수 있습니다.'}), 400
+    os.makedirs(SPECIAL_EQ_UPLOAD, exist_ok=True)
+    stored = uuid.uuid4().hex + '.pdf'
+    f.save(os.path.join(SPECIAL_EQ_UPLOAD, stored))
+    conn = get_special_eq_db()
+    conn.execute(
+        "INSERT INTO special_equipment_files (equipment_id, original_name, stored_name, uploaded_by) VALUES (?,?,?,?)",
+        (eid, f.filename, stored, session.get('name', '')))
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/special-equipment/file/<int:fid>/view')
+@login_required
+def special_equipment_file_view(fid):
+    conn = get_special_eq_db()
+    row = conn.execute("SELECT * FROM special_equipment_files WHERE id=?", (fid,)).fetchone()
+    conn.close()
+    if not row:
+        abort(404)
+    return send_from_directory(SPECIAL_EQ_UPLOAD, row['stored_name'],
+                               mimetype='application/pdf', download_name=row['original_name'])
+
+
+@app.route('/special-equipment/file/<int:fid>/delete', methods=['POST'])
+@login_required
+def special_equipment_file_delete(fid):
+    conn = get_special_eq_db()
+    row = conn.execute("SELECT stored_name FROM special_equipment_files WHERE id=?", (fid,)).fetchone()
+    if row:
+        try:
+            os.remove(os.path.join(SPECIAL_EQ_UPLOAD, row['stored_name']))
+        except OSError:
+            pass
+        conn.execute("DELETE FROM special_equipment_files WHERE id=?", (fid,))
+        conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
+
+
+# ════════════════════════════════════════════════════
+# 장비 유지보수현황 CRUD
+# ════════════════════════════════════════════════════
+@app.route('/maintenance')
+@login_required
+def maintenance_list():
+    conn = get_maintenance_db()
+    rows = conn.execute(
+        "SELECT * FROM maintenance ORDER BY category, model_name"
+    ).fetchall()
+    conn.close()
+    return render_template('maintenance.html', rows=rows)
+
+
+@app.route('/maintenance/add', methods=['POST'])
+@login_required
+def maintenance_add():
+    conn = get_maintenance_db()
+    conn.execute(
+        "INSERT INTO maintenance (category, asset_code, model_name, install_year, purchase_amount, vendor, contract_start, contract_end, contract_amount, pm_count, note) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        (request.form.get('category', '').strip(),
+         request.form.get('asset_code', '').strip(),
+         request.form.get('model_name', '').strip(),
+         request.form.get('install_year', '').strip(),
+         request.form.get('purchase_amount', '').strip(),
+         request.form.get('vendor', '').strip(),
+         request.form.get('contract_start', '').strip(),
+         request.form.get('contract_end', '').strip(),
+         request.form.get('contract_amount', '').strip(),
+         request.form.get('pm_count', '').strip(),
+         request.form.get('note', '').strip())
+    )
+    conn.commit()
+    conn.close()
+    return redirect(url_for('maintenance_list'))
+
+
+@app.route('/maintenance/edit/<int:mid>', methods=['POST'])
+@login_required
+def maintenance_edit(mid):
+    conn = get_maintenance_db()
+    conn.execute(
+        "UPDATE maintenance SET category=?, asset_code=?, model_name=?, install_year=?, purchase_amount=?, vendor=?, contract_start=?, contract_end=?, contract_amount=?, pm_count=?, note=? WHERE id=?",
+        (request.form.get('category', '').strip(),
+         request.form.get('asset_code', '').strip(),
+         request.form.get('model_name', '').strip(),
+         request.form.get('install_year', '').strip(),
+         request.form.get('purchase_amount', '').strip(),
+         request.form.get('vendor', '').strip(),
+         request.form.get('contract_start', '').strip(),
+         request.form.get('contract_end', '').strip(),
+         request.form.get('contract_amount', '').strip(),
+         request.form.get('pm_count', '').strip(),
+         request.form.get('note', '').strip(),
+         mid)
+    )
+    conn.commit()
+    conn.close()
+    return redirect(url_for('maintenance_list'))
+
+
+@app.route('/maintenance/delete/<int:mid>', methods=['POST'])
+@login_required
+def maintenance_delete(mid):
+    conn = get_maintenance_db()
+    conn.execute("DELETE FROM maintenance WHERE id=?", (mid,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('maintenance_list'))
 
 
 # ════════════════════════════════════════════════════
@@ -2195,10 +2574,363 @@ def radiation_device_edit(eid):
 @login_required
 def radiation_device_delete(eid):
     conn = get_radiation_db()
+    # 첨부 PDF 파일도 함께 삭제
+    files = conn.execute("SELECT stored_name FROM radiation_device_files WHERE device_id=?", (eid,)).fetchall()
+    for f in files:
+        try:
+            os.remove(os.path.join(RADIATION_UPLOAD, f['stored_name']))
+        except OSError:
+            pass
+    conn.execute("DELETE FROM radiation_device_files WHERE device_id=?", (eid,))
     conn.execute("DELETE FROM radiation_device WHERE id=?", (eid,))
     conn.commit()
     conn.close()
     return redirect(url_for('radiation_device_list'))
+
+
+# ── 진단용방사선발생장치 PDF 첨부파일 ──
+@app.route('/radiation-device/<int:eid>/files')
+@login_required
+def radiation_device_files(eid):
+    conn = get_radiation_db()
+    rows = conn.execute(
+        "SELECT id, original_name, uploaded_by, uploaded_at FROM radiation_device_files WHERE device_id=? ORDER BY original_name DESC",
+        (eid,)).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route('/radiation-device/<int:eid>/upload', methods=['POST'])
+@login_required
+def radiation_device_upload(eid):
+    f = request.files.get('pdf_file')
+    if not f or not f.filename:
+        return jsonify({'ok': False, 'error': '파일이 없습니다.'}), 400
+    if not f.filename.lower().endswith('.pdf'):
+        return jsonify({'ok': False, 'error': 'PDF 파일만 업로드할 수 있습니다.'}), 400
+    os.makedirs(RADIATION_UPLOAD, exist_ok=True)
+    stored = uuid.uuid4().hex + '.pdf'
+    f.save(os.path.join(RADIATION_UPLOAD, stored))
+    conn = get_radiation_db()
+    conn.execute(
+        "INSERT INTO radiation_device_files (device_id, original_name, stored_name, uploaded_by) VALUES (?,?,?,?)",
+        (eid, f.filename, stored, session.get('name', '')))
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/radiation-device/file/<int:fid>/view')
+@login_required
+def radiation_device_file_view(fid):
+    conn = get_radiation_db()
+    row = conn.execute("SELECT * FROM radiation_device_files WHERE id=?", (fid,)).fetchone()
+    conn.close()
+    if not row:
+        abort(404)
+    return send_from_directory(RADIATION_UPLOAD, row['stored_name'],
+                               mimetype='application/pdf', download_name=row['original_name'])
+
+
+@app.route('/radiation-device/file/<int:fid>/delete', methods=['POST'])
+@login_required
+def radiation_device_file_delete(fid):
+    conn = get_radiation_db()
+    row = conn.execute("SELECT stored_name FROM radiation_device_files WHERE id=?", (fid,)).fetchone()
+    if row:
+        try:
+            os.remove(os.path.join(RADIATION_UPLOAD, row['stored_name']))
+        except OSError:
+            pass
+        conn.execute("DELETE FROM radiation_device_files WHERE id=?", (fid,))
+        conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
+
+
+# ════════════════════════════════════════════════════
+# 일정관리 (캘린더)
+# ════════════════════════════════════════════════════
+@app.route('/schedule')
+@login_required
+def schedule_view():
+    return render_template('schedule.html')
+
+
+@app.route('/api/schedules')
+@login_required
+def api_schedules():
+    conn = get_calendar_db()
+    schedules = conn.execute("SELECT * FROM schedules ORDER BY start_date, start_time").fetchall()
+    conn.close()
+    
+    res = []
+    for s in schedules:
+        res.append({
+            'id': s['id'],
+            'title': s['title'],
+            'start_date': s['start_date'],
+            'end_date': s['end_date'],
+            'start_time': s['start_time'] or '',
+            'end_time': s['end_time'] or '',
+            'content': s['content'] or '',
+            'color': s['color'] or '#1a73e8'
+        })
+    return jsonify(res)
+
+
+@app.route('/api/schedules/add', methods=['POST'])
+@login_required
+def api_schedules_add():
+    title = request.form.get('title', '').strip()
+    start_date = request.form.get('start_date', '').strip()
+    end_date = request.form.get('end_date', '').strip()
+    start_time = request.form.get('start_time', '').strip()
+    end_time = request.form.get('end_time', '').strip()
+    content = request.form.get('content', '').strip()
+    color = request.form.get('color', '#1a73e8').strip()
+    
+    if not title or not start_date:
+        return jsonify({'success': False, 'message': '필수 항목이 누락되었습니다.'}), 400
+        
+    if not end_date:
+        end_date = start_date
+        
+    conn = get_calendar_db()
+    try:
+        conn.execute("""
+            INSERT INTO schedules (title, start_date, end_date, start_time, end_time, content, color)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (title, start_date, end_date, start_time, end_time, content, color))
+        conn.commit()
+        success = True
+        msg = "일정이 등록되었습니다."
+    except Exception as e:
+        success = False
+        msg = f"데이터베이스 오류: {str(e)}"
+    finally:
+        conn.close()
+        
+    return jsonify({'success': success, 'message': msg})
+
+
+@app.route('/api/schedules/edit/<int:id>', methods=['POST'])
+@login_required
+def api_schedules_edit(id):
+    title = request.form.get('title', '').strip()
+    start_date = request.form.get('start_date', '').strip()
+    end_date = request.form.get('end_date', '').strip()
+    start_time = request.form.get('start_time', '').strip()
+    end_time = request.form.get('end_time', '').strip()
+    content = request.form.get('content', '').strip()
+    color = request.form.get('color', '#1a73e8').strip()
+    
+    if not title or not start_date:
+        return jsonify({'success': False, 'message': '필수 항목이 누락되었습니다.'}), 400
+        
+    if not end_date:
+        end_date = start_date
+        
+    conn = get_calendar_db()
+    try:
+        conn.execute("""
+            UPDATE schedules 
+            SET title=?, start_date=?, end_date=?, start_time=?, end_time=?, content=?, color=?
+            WHERE id=?
+        """, (title, start_date, end_date, start_time, end_time, content, color, id))
+        conn.commit()
+        success = True
+        msg = "일정이 수정되었습니다."
+    except Exception as e:
+        success = False
+        msg = f"데이터베이스 오류: {str(e)}"
+    finally:
+        conn.close()
+        
+    return jsonify({'success': success, 'message': msg})
+
+
+@app.route('/api/schedules/delete/<int:id>', methods=['POST'])
+@login_required
+def api_schedules_delete(id):
+    conn = get_calendar_db()
+    try:
+        conn.execute("DELETE FROM schedules WHERE id=?", (id,))
+        conn.commit()
+        success = True
+        msg = "일정이 삭제되었습니다."
+    except Exception as e:
+        success = False
+        msg = f"데이터베이스 오류: {str(e)}"
+    finally:
+        conn.close()
+        
+    return jsonify({'success': success, 'message': msg})
+
+
+@app.route('/api/schedules/export')
+@login_required
+def api_schedules_export():
+    conn = get_calendar_db()
+    schedules = conn.execute("SELECT * FROM schedules").fetchall()
+    conn.close()
+    
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Radiology Worklog//Calendar//KO",
+        "CALSCALE:GREGORIAN"
+    ]
+    for s in schedules:
+        lines.append("BEGIN:VEVENT")
+        lines.append(f"UID:schedule_{s['id']}@radiology_worklog")
+        
+        s_date = s['start_date'].replace('-', '')
+        e_date = s['end_date'].replace('-', '')
+        
+        if s['start_time']:
+            s_time = s['start_time'].replace(':', '') + "00"
+            lines.append(f"DTSTART:{s_date}T{s_time}")
+        else:
+            lines.append(f"DTSTART;VALUE=DATE:{s_date}")
+            
+        if s['end_time']:
+            e_time = s['end_time'].replace(':', '') + "00"
+            lines.append(f"DTEND:{e_date}T{e_time}")
+        else:
+            try:
+                # all-day event end date is exclusive in iCalendar
+                e_dt = datetime.strptime(s['end_date'], '%Y-%m-%d') + timedelta(days=1)
+                e_date_exclusive = e_dt.strftime('%Y%m%d')
+            except Exception:
+                e_date_exclusive = e_date
+            lines.append(f"DTEND;VALUE=DATE:{e_date_exclusive}")
+            
+        title_escaped = s['title'].replace(',', '\\,').replace(';', '\\;').replace('\n', '\\n')
+        lines.append(f"SUMMARY:{title_escaped}")
+        
+        if s['content']:
+            desc_escaped = s['content'].replace(',', '\\,').replace(';', '\\;').replace('\n', '\\n')
+            lines.append(f"DESCRIPTION:{desc_escaped}")
+            
+        lines.append("END:VEVENT")
+    lines.append("END:VCALENDAR")
+    
+    ics_content = "\r\n".join(lines)
+    
+    from flask import Response
+    return Response(
+        ics_content,
+        mimetype="text/calendar",
+        headers={"Content-disposition": "attachment; filename=calendar.ics"}
+    )
+
+
+@app.route('/api/schedules/import', methods=['POST'])
+@login_required
+def api_schedules_import():
+    if 'file' not in request.files:
+        flash('파일이 업로드되지 않았습니다.', 'warning')
+        return redirect(url_for('schedule_view'))
+        
+    f = request.files['file']
+    if f.filename == '':
+        flash('선택된 파일이 없습니다.', 'warning')
+        return redirect(url_for('schedule_view'))
+        
+    if not f.filename.endswith('.ics'):
+        flash('올바른 .ics 확장자 파일이 아닙니다.', 'warning')
+        return redirect(url_for('schedule_view'))
+        
+    try:
+        content_bytes = f.read()
+        # Decode trying different encodings
+        try:
+            content = content_bytes.decode('utf-8')
+        except UnicodeDecodeError:
+            content = content_bytes.decode('cp949', errors='ignore')
+            
+        # Parse ICS file
+        events = []
+        current_event = None
+        lines = content.splitlines()
+        
+        # Unfold multiline iCalendar properties
+        unfolded_lines = []
+        for line in lines:
+            if line.startswith(' ') or line.startswith('\t'):
+                if unfolded_lines:
+                     unfolded_lines[-1] += line[1:]
+            else:
+                 unfolded_lines.append(line)
+                 
+        for line in unfolded_lines:
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith('BEGIN:VEVENT'):
+                current_event = {
+                    'title': '', 'start_date': '', 'end_date': '',
+                    'start_time': '', 'end_time': '', 'content': '',
+                    'color': '#1a73e8'
+                }
+            elif line.startswith('END:VEVENT'):
+                if current_event and current_event['title'] and current_event['start_date']:
+                    if not current_event['end_date']:
+                        current_event['end_date'] = current_event['start_date']
+                    events.append(current_event)
+                current_event = None
+            elif current_event is not None:
+                if ':' in line:
+                    key_part, val = line.split(':', 1)
+                    key = key_part.split(';')[0]
+                    
+                    if key == 'SUMMARY':
+                        current_event['title'] = val.replace('\\,', ',').replace('\\;', ';').replace('\\n', '\n').strip()
+                    elif key == 'DESCRIPTION':
+                        current_event['content'] = val.replace('\\,', ',').replace('\\;', ';').replace('\\n', '\n').strip()
+                    elif key == 'DTSTART':
+                        val = val.strip()
+                        if 'T' in val:
+                            dt_part, tm_part = val.split('T')
+                            current_event['start_date'] = f"{dt_part[:4]}-{dt_part[4:6]}-{dt_part[6:8]}"
+                            current_event['start_time'] = f"{tm_part[:2]}:{tm_part[2:4]}"
+                        else:
+                            current_event['start_date'] = f"{val[:4]}-{val[4:6]}-{val[6:8]}"
+                    elif key == 'DTEND':
+                        val = val.strip()
+                        if 'T' in val:
+                            dt_part, tm_part = val.split('T')
+                            current_event['end_date'] = f"{dt_part[:4]}-{dt_part[4:6]}-{dt_part[6:8]}"
+                            current_event['end_time'] = f"{tm_part[:2]}:{tm_part[2:4]}"
+                        else:
+                            # Standard ICS exclusive end-date: we need to subtract 1 day to match database inclusive format for all-day events
+                            try:
+                                e_dt = datetime.strptime(f"{val[:4]}-{val[4:6]}-{val[6:8]}", '%Y-%m-%d') - timedelta(days=1)
+                                current_event['end_date'] = e_dt.strftime('%Y-%m-%d')
+                            except Exception:
+                                current_event['end_date'] = f"{val[:4]}-{val[4:6]}-{val[6:8]}"
+                                
+        if not events:
+            flash('가져올 일정이 없습니다.', 'warning')
+            return redirect(url_for('schedule_view'))
+            
+        conn = get_calendar_db()
+        imported_count = 0
+        for ev in events:
+            conn.execute("""
+                INSERT INTO schedules (title, start_date, end_date, start_time, end_time, content, color)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (ev['title'], ev['start_date'], ev['end_date'], ev['start_time'], ev['end_time'], ev['content'], ev['color']))
+            imported_count += 1
+        conn.commit()
+        conn.close()
+        
+        flash(f'총 {imported_count}개의 일정이 성공적으로 등록되었습니다.', 'success')
+    except Exception as e:
+        flash(f'가져오기 실패: {str(e)}', 'danger')
+        
+    return redirect(url_for('schedule_view'))
 
 
 # ════════════════════════════════════════════════════
@@ -2208,10 +2940,12 @@ if __name__ == '__main__':
     init_db()
     init_special_eq_db()
     init_radiation_db()
+    init_calendar_db()
+    init_maintenance_db()
     try:
         from waitress import serve
         print('[INFO] 서버 시작 중... http://localhost:1000')
         serve(app, host='0.0.0.0', port=1000, threads=8)
     except ImportError:
-        print('[WARN] waitress 미설치 — Flask 개발 서버로 시작합니다.')
+        print('[WARN] waitress 미설치 - Flask 개발 서버로 시작합니다.')
         app.run(host='0.0.0.0', port=1000, debug=False)

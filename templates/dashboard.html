@@ -2,12 +2,20 @@
 {% block page_title %}대시보드{% endblock %}
 {% block content %}
 <style>
-.tab-bar{display:flex;gap:0;margin-bottom:16px;background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.1);overflow:hidden}
-.tab-btn{flex:1;padding:12px 16px;border:none;background:#f8f9fa;color:#555;font-size:14px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;transition:.2s;font-family:inherit}
-.tab-btn.active{background:#fff;color:#1a73e8;border-bottom-color:#1a73e8}
-.tab-btn:hover:not(.active){background:#eef2ff}
-.tab-panel{display:none}
-.tab-panel.active{display:block}
+.acc-item{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.1);margin-bottom:10px;overflow:hidden}
+.acc-header{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;user-select:none;border-left:4px solid transparent;transition:background .15s}
+.acc-header:hover{background:#f8f9fa}
+.acc-item.open>.acc-header{background:#f8f9fa;border-left-color:#1a73e8}
+.acc-item.today>.acc-header{border-left-color:#1a73e8}
+.acc-caret{color:#999;font-size:12px;transition:transform .2s;flex:0 0 auto}
+.acc-item.open .acc-caret{transform:rotate(90deg)}
+.acc-label{font-weight:700;font-size:15px;color:#333;flex:0 0 auto}
+.acc-item.today .acc-label{color:#1a73e8}
+.acc-date{font-size:14px;color:#555;font-weight:600}
+.acc-weekday{font-size:12px;color:#888;margin-left:2px}
+.acc-body{display:none;padding:14px 16px 4px}
+.acc-item.open .acc-body{display:block}
+.acc-spacer{flex:1}
 
 .section-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
 .dash-section{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.1);overflow:hidden}
@@ -22,31 +30,56 @@
 .roster-group .names{color:#333}
 .empty-msg{color:#aaa;font-size:12px;padding:8px 0}
 .date-badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:700;background:#e8f0fe;color:#1a73e8;margin-left:6px}
+.tab-btn .badge {margin-left:6px;font-size:10px;padding:2px 6px;vertical-align:middle}
+.checklist-scroll{max-height:350px;overflow-y:auto;border:1px solid #e0e0e0;border-radius:4px}
+.checklist-scroll th{position:sticky;top:0;background:#f0f4ff!important;z-index:2;box-shadow:inset 0 -1px 0 #e0e0e0}
 </style>
 
-<!-- D-day / D-1 탭 -->
-<div class="tab-bar">
-  <button class="tab-btn active" onclick="switchTab('today')">
-    📅 D-day <span class="date-badge">{{ today }}</span>
-  </button>
-  <button class="tab-btn" onclick="switchTab('d1')">
-    📅 D-1 <span class="date-badge">{{ d1 }}</span>
-  </button>
+<!-- 상단 기준일 선택 영역 -->
+<div style="display:flex; justify-content:flex-end; align-items:center; margin-bottom:14px; gap:8px; background:#fff; padding:8px 16px; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.1)">
+  <label for="dash-date-picker" style="margin-bottom:0; font-weight:600; font-size:13px; color:#555; white-space:nowrap">기준일 선택:</label>
+  <input type="date" id="dash-date-picker" value="{{ base_date }}" onchange="location.href='/?date='+this.value" style="width:145px; padding:4px 8px; font-size:13px; border:1px solid #ccc; border-radius:4px; font-family:inherit">
 </div>
 
-<!-- ─── D-day (오늘) 탭 ─── -->
-<div class="tab-panel active" id="panel-today">
-  <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
-    <a href="/write?date={{ today }}" class="btn btn-primary btn-sm">✏️ 오늘 업무일지 작성</a>
+{% for day in days %}
+<!-- ─── {{ day.label }} 아코디언 항목 ─── -->
+<div class="acc-item {% if loop.first %}open today{% endif %}" id="acc-{{ loop.index0 }}">
+  <div class="acc-header" onclick="toggleAcc('{{ loop.index0 }}')">
+    <span class="acc-caret">▶</span>
+    <span class="acc-label">{{ day.label }}</span>
+    <span class="acc-date">({{ day.date_str }}<span class="acc-weekday">{{ day.weekday }}</span>)</span>
+    {% if day.status %}
+      <span class="badge badge-{{ day.status_class }}">{{ day.status }}</span>
+    {% else %}
+      <span class="badge badge-secondary">미작성</span>
+    {% endif %}
+    <span class="acc-spacer"></span>
+    {% if day.status in ('제출', '확정') %}
+      <a href="#" onclick="event.stopPropagation(); window.open('/print/{{ day.date_str }}', 'worklog_popup_{{ day.date_str }}', 'width=900,height=900,scrollbars=yes'); return false;" class="btn btn-secondary btn-sm">👁️ 보기</a>
+    {% else %}
+      <a href="/write?date={{ day.date_str }}" onclick="event.stopPropagation()" class="btn btn-primary btn-sm">✏️ 작성</a>
+    {% endif %}
   </div>
+  <div class="acc-body">
+  {% if day.schedules %}
+    <div style="margin-bottom:12px; padding:8px 12px; background:#f8f9fa; border-left:3px solid #1a73e8; border-radius:0 4px 4px 0; display:flex; flex-direction:column; gap:4px;">
+      {% if day.schedules|length == 1 %}
+        <span style="font-size:13px; color:#444; font-weight:600;">📅 {{ day.schedules[0].title }}</span>
+      {% else %}
+        {% for s in day.schedules %}
+          <span style="font-size:13px; color:#444; font-weight:600; line-height:1.4;">{{ loop.index }}. {{ s.title }}</span>
+        {% endfor %}
+      {% endif %}
+    </div>
+  {% endif %}
 
   <div class="section-grid">
     <!-- 근무자 현황 -->
     <div class="dash-section">
       <div class="dash-title">👥 근무자 현황</div>
       <div class="dash-body">
-        {% if roster_grouped %}
-          {% for (shift, part), names in roster_grouped %}
+        {% if day.roster_grouped %}
+          {% for (shift, part), names in day.roster_grouped %}
           <div class="roster-group">
             <div class="group-label">{{ shift }} {{ part }}</div>
             <div class="names">{{ names|join(', ') }}</div>
@@ -62,11 +95,11 @@
     <div class="dash-section">
       <div class="dash-title">🏖️ 휴가 현황</div>
       <div class="dash-body">
-        {% if vacation_today %}
+        {% if day.vacation %}
         <table>
           <thead><tr><th>파트</th><th>휴가코드</th><th>성명</th></tr></thead>
           <tbody>
-          {% for v in vacation_today %}
+          {% for v in day.vacation %}
           <tr><td>{{ v.part }}</td><td>{{ v.vacation_code }}</td><td>{{ v.staff_name }}</td></tr>
           {% endfor %}
           </tbody>
@@ -83,11 +116,11 @@
     <div class="dash-section">
       <div class="dash-title">📞 On-call 현황</div>
       <div class="dash-body">
-        {% if oncall_today %}
+        {% if day.oncall %}
         <table>
           <thead><tr><th>파트</th><th>성명</th><th>병원도착</th><th>시술시작</th><th>시술종료</th><th>퇴실</th><th>총시간</th><th>사유</th></tr></thead>
           <tbody>
-          {% for o in oncall_today %}
+          {% for o in day.oncall %}
           <tr><td>{{ o.part }}</td><td>{{ o.staff_name }}</td><td>{{ o.arrival_time or o.start_time }}</td><td>{{ o.procedure_start }}</td><td>{{ o.procedure_end }}</td><td>{{ o.departure_time or o.end_time }}</td><td>{{ format_hh_mm(o.hours) if o.hours else '' }}</td><td>{{ o.reason }}</td></tr>
           {% endfor %}
           </tbody>
@@ -102,11 +135,11 @@
     <div class="dash-section">
       <div class="dash-title">⏰ 연장근무 현황</div>
       <div class="dash-body">
-        {% if overtime_today %}
+        {% if day.overtime %}
         <table>
           <thead><tr><th>파트</th><th>성명</th><th>시작</th><th>종료</th><th>총시간</th><th>사유</th></tr></thead>
           <tbody>
-          {% for ot in overtime_today %}
+          {% for ot in day.overtime %}
           <tr><td>{{ ot.part }}</td><td>{{ ot.staff_name }}</td><td>{{ ot.start_time }}</td><td>{{ ot.end_time }}</td><td>{{ format_hh_mm(ot.hours) if ot.hours else '' }}</td><td>{{ ot.reason }}</td></tr>
           {% endfor %}
           </tbody>
@@ -122,11 +155,11 @@
   <div class="dash-section-full">
     <div class="dash-title">🔧 장비 이력</div>
     <div class="dash-body">
-      {% if equipment_today %}
+      {% if day.equipment %}
       <table>
         <thead><tr><th>장비명</th><th>유형</th><th>내용</th><th>엔지니어</th><th>시작</th><th>종료</th><th>다운타임</th><th>상태</th></tr></thead>
         <tbody>
-        {% for e in equipment_today %}
+        {% for e in day.equipment %}
         <tr>
           <td>{{ e.equipment_name }}</td><td>{{ e.log_type }}</td><td>{{ e.description }}</td>
           <td>{{ e.engineer }}</td><td>{{ e.start_time }}</td><td>{{ e.end_time }}</td><td>{{ e.downtime }}</td>
@@ -145,11 +178,11 @@
   <div class="dash-section-full">
     <div class="dash-title">⚠️ 특이사항·이슈</div>
     <div class="dash-body">
-      {% if issues_today %}
+      {% if day.issues %}
       <table>
         <thead><tr><th>구분</th><th>심각도</th><th>제목</th><th>내용</th><th>상태</th></tr></thead>
         <tbody>
-        {% for iss in issues_today %}
+        {% for iss in day.issues %}
         <tr>
           <td>{{ iss.category }}</td>
           <td><span class="badge {{ 'badge-danger' if iss.severity=='긴급' else ('badge-warning' if iss.severity=='중요' else 'badge-secondary') }}">{{ iss.severity }}</span></td>
@@ -163,145 +196,48 @@
       {% endif %}
     </div>
   </div>
-</div>
 
-<!-- ─── D-1 탭 ─── -->
-<div class="tab-panel" id="panel-d1">
-  <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
-    <a href="/write?date={{ d1 }}" class="btn btn-secondary btn-sm">✏️ D-1 업무일지 보기</a>
-  </div>
-
-  <div class="section-grid">
-    <!-- 근무자 현황 D-1 -->
-    <div class="dash-section">
-      <div class="dash-title">👥 근무자 현황</div>
-      <div class="dash-body">
-        {% if roster_grouped_d1 %}
-          {% for (shift, part), names in roster_grouped_d1 %}
-          <div class="roster-group">
-            <div class="group-label">{{ shift }} {{ part }}</div>
-            <div class="names">{{ names|join(', ') }}</div>
-          </div>
-          {% endfor %}
-        {% else %}
-          <div class="empty-msg">등록된 근무자가 없습니다.</div>
-        {% endif %}
-      </div>
-    </div>
-
-    <!-- 휴가 현황 D-1 -->
-    <div class="dash-section">
-      <div class="dash-title">🏖️ 휴가 현황</div>
-      <div class="dash-body">
-        {% if vacation_d1 %}
-        <table>
-          <thead><tr><th>파트</th><th>휴가코드</th><th>성명</th></tr></thead>
-          <tbody>
-          {% for v in vacation_d1 %}
-          <tr><td>{{ v.part }}</td><td>{{ v.vacation_code }}</td><td>{{ v.staff_name }}</td></tr>
-          {% endfor %}
-          </tbody>
-        </table>
-        {% else %}
-          <div class="empty-msg">해당 없음</div>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-
-  <div class="section-grid">
-    <!-- On-call D-1 -->
-    <div class="dash-section">
-      <div class="dash-title">📞 On-call 현황</div>
-      <div class="dash-body">
-        {% if oncall_d1 %}
-        <table>
-          <thead><tr><th>파트</th><th>성명</th><th>병원도착</th><th>시술시작</th><th>시술종료</th><th>퇴실</th><th>총시간</th><th>사유</th></tr></thead>
-          <tbody>
-          {% for o in oncall_d1 %}
-          <tr><td>{{ o.part }}</td><td>{{ o.staff_name }}</td><td>{{ o.arrival_time or o.start_time }}</td><td>{{ o.procedure_start }}</td><td>{{ o.procedure_end }}</td><td>{{ o.departure_time or o.end_time }}</td><td>{{ format_hh_mm(o.hours) if o.hours else '' }}</td><td>{{ o.reason }}</td></tr>
-          {% endfor %}
-          </tbody>
-        </table>
-        {% else %}
-          <div class="empty-msg">해당 없음</div>
-        {% endif %}
-      </div>
-    </div>
-
-    <!-- 연장근무 D-1 -->
-    <div class="dash-section">
-      <div class="dash-title">⏰ 연장근무 현황</div>
-      <div class="dash-body">
-        {% if overtime_d1 %}
-        <table>
-          <thead><tr><th>파트</th><th>성명</th><th>시작</th><th>종료</th><th>총시간</th><th>사유</th></tr></thead>
-          <tbody>
-          {% for ot in overtime_d1 %}
-          <tr><td>{{ ot.part }}</td><td>{{ ot.staff_name }}</td><td>{{ ot.start_time }}</td><td>{{ ot.end_time }}</td><td>{{ format_hh_mm(ot.hours) if ot.hours else '' }}</td><td>{{ ot.reason }}</td></tr>
-          {% endfor %}
-          </tbody>
-        </table>
-        {% else %}
-          <div class="empty-msg">해당 없음</div>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-
-  <!-- 장비 이력 D-1 -->
+  <!-- 야간 체크리스트 -->
   <div class="dash-section-full">
-    <div class="dash-title">🔧 장비 이력</div>
+    <div class="dash-title">📋 야간 체크리스트</div>
     <div class="dash-body">
-      {% if equipment_d1 %}
-      <table>
-        <thead><tr><th>장비명</th><th>유형</th><th>내용</th><th>엔지니어</th><th>시작</th><th>종료</th><th>다운타임</th><th>상태</th></tr></thead>
-        <tbody>
-        {% for e in equipment_d1 %}
-        <tr>
-          <td>{{ e.equipment_name }}</td><td>{{ e.log_type }}</td><td>{{ e.description }}</td>
-          <td>{{ e.engineer }}</td><td>{{ e.start_time }}</td><td>{{ e.end_time }}</td><td>{{ e.downtime }}</td>
-          <td><span class="badge {{ 'badge-danger' if e.status=='처리중' else 'badge-success' }}">{{ e.status }}</span></td>
-        </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-      {% else %}
-        <div class="empty-msg">해당 없음</div>
-      {% endif %}
+      <div class="checklist-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:40px;text-align:center">구분</th>
+              <th style="text-align:left">확인항목</th>
+              <th style="width:80px;text-align:center">문잠금</th>
+              <th style="width:90px;text-align:center">형광등 소등</th>
+              <th style="width:100px;text-align:center">냉·난방기구</th>
+              <th style="text-align:left">비고</th>
+              <th style="text-align:left">확인결과</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for item in day.night_checklist %}
+          <tr>
+            <td style="text-align:center">{{ item.no }}</td>
+            <td style="font-weight:600">{{ item.name }}</td>
+            <td style="text-align:center;font-weight:700;color:{% if item.door_lock=='O' %}#2e7d32{% elif item.door_lock=='X' %}#c62828{% else %}#aaa{% endif %}">{{ item.door_lock or '-' }}</td>
+            <td style="text-align:center;font-weight:700;color:{% if item.light_off=='O' %}#2e7d32{% elif item.light_off=='X' %}#c62828{% else %}#aaa{% endif %}">{{ item.light_off or '-' }}</td>
+            <td style="text-align:center;font-weight:700;color:{% if item.hvac=='O' %}#2e7d32{% elif item.hvac=='X' %}#c62828{% else %}#aaa{% endif %}">{{ item.hvac or '-' }}</td>
+            <td>{{ item.remark or '' }}</td>
+            <td>{{ item.check_result or '' }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
-
-  <!-- 특이사항·이슈 D-1 -->
-  <div class="dash-section-full">
-    <div class="dash-title">⚠️ 특이사항·이슈</div>
-    <div class="dash-body">
-      {% if issues_d1 %}
-      <table>
-        <thead><tr><th>구분</th><th>심각도</th><th>제목</th><th>내용</th><th>상태</th></tr></thead>
-        <tbody>
-        {% for iss in issues_d1 %}
-        <tr>
-          <td>{{ iss.category }}</td>
-          <td><span class="badge {{ 'badge-danger' if iss.severity=='긴급' else ('badge-warning' if iss.severity=='중요' else 'badge-secondary') }}">{{ iss.severity }}</span></td>
-          <td>{{ iss.title }}</td><td>{{ iss.content }}</td><td>{{ iss.status }}</td>
-        </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-      {% else %}
-        <div class="empty-msg">해당 없음</div>
-      {% endif %}
-    </div>
   </div>
 </div>
+{% endfor %}
 
 <script>
-function switchTab(tab) {
-  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
-  document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
-  document.getElementById('panel-' + tab).classList.add('active');
-  event.currentTarget.classList.add('active');
+function toggleAcc(idx) {
+  document.getElementById('acc-' + idx).classList.toggle('open');
 }
 </script>
 {% endblock %}

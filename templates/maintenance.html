@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% block page_title %}장비 유지보수현황{% endblock %}
+{% block content %}
+<style>
+.mt-table th{background:#f0f4ff;font-size:12px;padding:7px 8px;white-space:nowrap}
+.mt-table td{padding:7px 8px;vertical-align:middle;font-size:12px}
+.mt-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:16px;flex-wrap:wrap}
+.btn-group{display:flex;gap:4px;flex-wrap:wrap}
+.cat-header td{background:#e8edf5;font-weight:700;font-size:12px;color:#1e2a3a;padding:6px 8px;border-top:2px solid #c5cfe0}
+
+/* ── 모달 ── */
+.mt-modal-bg{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:600;align-items:center;justify-content:center;overflow-y:auto}
+.mt-modal-bg.open{display:flex}
+.mt-modal{background:#fff;border-radius:10px;padding:28px;width:640px;max-width:96vw;box-shadow:0 6px 32px rgba(0,0,0,.2);max-height:90vh;overflow-y:auto}
+.mt-modal h3{font-size:15px;margin-bottom:18px;color:#222}
+.mt-modal .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.mt-modal .form-row.full{grid-template-columns:1fr}
+.mt-modal .form-row.three{grid-template-columns:1fr 1fr 1fr;gap:10px}
+.mt-modal label{font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px}
+.mt-modal input,.mt-modal select,.mt-modal textarea{width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:5px;font-size:13px;box-sizing:border-box}
+.mt-modal textarea{min-height:60px;resize:vertical}
+.mt-modal .modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+
+/* ── 계약 상태 배지 ── */
+.exp-badge{display:inline-block;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:700;white-space:nowrap}
+.exp-warn .exp-badge{background:#ffcdd2;color:#b71c1c;border:1px solid #ef9a9a}
+.exp-soon .exp-badge{background:#ffe0b2;color:#bf360c;border:1px solid #ffcc80}
+.exp-ok   .exp-badge{background:#c8e6c9;color:#1b5e20;border:1px solid #a5d6a7}
+
+/* ── 범례 ── */
+.legend{display:flex;gap:10px;font-size:12px;align-items:center;flex-wrap:wrap}
+.legend-chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:12px;font-weight:600;font-size:11px}
+.legend-chip.warn{background:#ffcdd2;color:#b71c1c;border:1px solid #ef9a9a}
+.legend-chip.soon{background:#ffe0b2;color:#bf360c;border:1px solid #ffcc80}
+.legend-chip.ok  {background:#c8e6c9;color:#1b5e20;border:1px solid #a5d6a7}
+</style>
+
+<div class="mt-toolbar">
+  <div class="legend">
+    <span class="legend-chip warn">● 계약 만료 / 미계약</span>
+    <span class="legend-chip soon">● 3개월 이내 만료</span>
+    <span class="legend-chip ok">● 계약 유효</span>
+  </div>
+  <button class="btn btn-primary btn-sm" onclick="openMtModal()" style="white-space:nowrap">+ 신규 추가</button>
+</div>
+
+<div class="table-wrap">
+  <table class="mt-table">
+    <thead>
+      <tr>
+        <th>No</th>
+        <th>파트</th>
+        <th>자산코드</th>
+        <th>모델명</th>
+        <th>도입연도</th>
+        <th>구입금액</th>
+        <th>유지보수 업체</th>
+        <th>계약기간</th>
+        <th>유지보수 금액(원)</th>
+        <th>PM 횟수</th>
+        <th>특이사항</th>
+        <th>관리</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% set ns = namespace(prev_cat='', idx=0) %}
+    {% for r in rows %}
+      {% if r.category != ns.prev_cat %}
+      <tr class="cat-header">
+        <td colspan="12">📂 {{ r.category if r.category else '(파트 미지정)' }}</td>
+      </tr>
+      {% set ns.prev_cat = r.category %}
+      {% endif %}
+      {% set ns.idx = ns.idx + 1 %}
+      {% set today = now[:10] %}
+      {% if r.contract_end %}
+        {% if r.contract_end < today %}
+          {% set exp_class = 'exp-warn' %}
+          {% set exp_label = '만료' %}
+        {% elif r.contract_end <= (today[:4] + '-' + '%02d'|format((today[5:7]|int + 3) if today[5:7]|int <= 9 else (today[5:7]|int + 3)) + today[7:]) %}
+          {% set exp_class = 'exp-soon' %}
+          {% set exp_label = '만료 임박' %}
+        {% else %}
+          {% set exp_class = 'exp-ok' %}
+          {% set exp_label = '유효' %}
+        {% endif %}
+      {% else %}
+        {% set exp_class = 'exp-warn' %}
+        {% set exp_label = '미계약' %}
+      {% endif %}
+      <tr>
+        <td style="color:#aaa;text-align:center">{{ ns.idx }}</td>
+        <td><span class="badge badge-info" style="font-size:11px">{{ r.category }}</span></td>
+        <td style="color:#555;font-size:12px">{{ r.asset_code }}</td>
+        <td style="font-weight:600">{{ r.model_name }}</td>
+        <td style="white-space:nowrap;text-align:center">{{ r.install_year }}</td>
+        <td style="white-space:nowrap;text-align:right">{{ r.purchase_amount }}</td>
+        <td>{{ r.vendor }}</td>
+        <td class="{{ exp_class }}" style="white-space:nowrap">
+          {% if r.contract_start or r.contract_end %}
+            <div>{{ r.contract_start }} ~ {{ r.contract_end }}</div>
+            <div style="margin-top:3px"><span class="exp-badge">{{ exp_label }}</span></div>
+          {% else %}
+            <span class="exp-badge">미계약</span>
+          {% endif %}
+        </td>
+        <td style="white-space:nowrap;text-align:right">{{ r.contract_amount }}</td>
+        <td style="text-align:center">{{ r.pm_count }}</td>
+        <td style="color:#555;font-size:11px;max-width:180px;word-break:break-all">{{ r.note }}</td>
+        <td>
+          <div class="btn-group">
+            <button class="btn btn-sm btn-warning" onclick="openMtEditModalFromBtn(this)"
+              data-id="{{ r.id }}"
+              data-category="{{ r.category|e }}"
+              data-asset-code="{{ r.asset_code|e }}"
+              data-model-name="{{ r.model_name|e }}"
+              data-install-year="{{ r.install_year|e }}"
+              data-purchase-amount="{{ r.purchase_amount|e }}"
+              data-vendor="{{ r.vendor|e }}"
+              data-contract-start="{{ r.contract_start|e }}"
+              data-contract-end="{{ r.contract_end|e }}"
+              data-contract-amount="{{ r.contract_amount|e }}"
+              data-pm-count="{{ r.pm_count|e }}"
+              data-note="{{ r.note|e }}">수정</button>
+            <form method="post" action="/maintenance/delete/{{ r.id }}" style="display:inline"
+                  onsubmit="return confirm('삭제하시겠습니까?')">
+              <button class="btn btn-sm btn-danger">삭제</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+    {% else %}
+    <tr><td colspan="12" style="text-align:center;color:#aaa;padding:24px">등록된 유지보수 계약이 없습니다.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- 추가/수정 모달 -->
+<div class="mt-modal-bg" id="mtModal">
+  <div class="mt-modal">
+    <h3 id="mtModalTitle">유지보수현황 신규 추가</h3>
+    <form method="post" id="mtForm" action="/maintenance/add">
+      <div class="form-row">
+        <div>
+          <label>파트 <span style="color:red">*</span></label>
+          <select name="category" id="mt_category">
+            <option value="">선택</option>
+            <option value="일반촬영">일반촬영</option>
+            <option value="CT">CT</option>
+            <option value="MR">MR</option>
+            <option value="인터벤션">인터벤션</option>
+            <option value="초음파">초음파</option>
+            <option value="골밀도">골밀도</option>
+            <option value="유방촬영">유방촬영</option>
+            <option value="PACS">PACS</option>
+            <option value="기타">기타</option>
+          </select>
+        </div>
+        <div>
+          <label>자산코드</label>
+          <input type="text" name="asset_code" id="mt_asset_code" placeholder="예) 12345678">
+        </div>
+      </div>
+      <div class="form-row full">
+        <div>
+          <label>모델명 <span style="color:red">*</span></label>
+          <input type="text" name="model_name" id="mt_model_name" required placeholder="예) Brilliance iCT">
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label>도입연도</label>
+          <input type="date" name="install_year" id="mt_install_year">
+        </div>
+        <div>
+          <label>구입금액(원)</label>
+          <input type="text" name="purchase_amount" id="mt_purchase_amount"
+                 inputmode="numeric" placeholder="예) 1,200,000,000"
+                 oninput="fmtAmount(this)">
+        </div>
+      </div>
+      <div class="form-row full">
+        <div>
+          <label>유지보수 업체</label>
+          <input type="text" name="vendor" id="mt_vendor" placeholder="예) (주)필립스코리아">
+        </div>
+      </div>
+      <div class="form-row three">
+        <div>
+          <label>계약 시작일</label>
+          <input type="date" name="contract_start" id="mt_contract_start">
+        </div>
+        <div>
+          <label>계약 종료일</label>
+          <input type="date" name="contract_end" id="mt_contract_end">
+        </div>
+        <div>
+          <label>유지보수 금액(원)</label>
+          <input type="text" name="contract_amount" id="mt_contract_amount"
+                 inputmode="numeric" placeholder="예) 16,000,000"
+                 oninput="fmtAmount(this)">
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label>PM 횟수</label>
+          <input type="text" name="pm_count" id="mt_pm_count" placeholder="예) 연 2회, 분기 1회">
+        </div>
+        <div></div>
+      </div>
+      <div class="form-row full">
+        <div>
+          <label>특이사항</label>
+          <textarea name="note" id="mt_note" placeholder="소모품 포함 내용, Detector 보증기간 등"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeMtModal()">취소</button>
+        <button type="submit" class="btn btn-primary" id="mtSaveBtn">저장</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+/* ── 천단위 콤마 포맷 ── */
+function fmtAmount(el) {
+  const raw = el.value.replace(/[^0-9]/g, '');
+  el.value = raw ? Number(raw).toLocaleString('ko-KR') : '';
+}
+
+const MT_FIELDS = ['category','asset_code','model_name','install_year','purchase_amount','vendor',
+                   'contract_start','contract_end','contract_amount','pm_count','note'];
+
+function openMtModal() {
+  document.getElementById('mtModalTitle').textContent = '유지보수현황 신규 추가';
+  document.getElementById('mtForm').action = '/maintenance/add';
+  document.getElementById('mtSaveBtn').textContent = '저장';
+  MT_FIELDS.forEach(f => {
+    const el = document.getElementById('mt_' + f);
+    if (el) el.value = '';
+  });
+  document.getElementById('mtModal').classList.add('open');
+}
+
+function openMtEditModalFromBtn(btn) {
+  const d = btn.dataset;
+  openMtEditModal(d.id, d.category, d.assetCode, d.modelName,
+    d.installYear, d.purchaseAmount, d.vendor,
+    d.contractStart, d.contractEnd, d.contractAmount,
+    d.pmCount, d.note);
+}
+
+function openMtEditModal(id, category, asset_code, model_name, install_year, purchase_amount,
+                          vendor, contract_start, contract_end, contract_amount, pm_count, note) {
+  document.getElementById('mtModalTitle').textContent = '유지보수현황 수정';
+  document.getElementById('mtForm').action = '/maintenance/edit/' + id;
+  document.getElementById('mtSaveBtn').textContent = '저장';
+  document.getElementById('mt_category').value        = category;
+  document.getElementById('mt_asset_code').value      = asset_code;
+  document.getElementById('mt_model_name').value      = model_name;
+  document.getElementById('mt_install_year').value    = install_year;
+  document.getElementById('mt_purchase_amount').value = purchase_amount;
+  document.getElementById('mt_vendor').value          = vendor;
+  document.getElementById('mt_contract_start').value  = contract_start;
+  document.getElementById('mt_contract_end').value    = contract_end;
+  document.getElementById('mt_contract_amount').value = contract_amount;
+  document.getElementById('mt_pm_count').value        = pm_count;
+  document.getElementById('mt_note').value            = note.replace(/\\n/g, '\n');
+  document.getElementById('mtModal').classList.add('open');
+}
+
+function closeMtModal() {
+  document.getElementById('mtModal').classList.remove('open');
+}
+
+document.getElementById('mtModal').addEventListener('click', function(e) {
+  if (e.target === this) closeMtModal();
+});
+</script>
+{% endblock %}

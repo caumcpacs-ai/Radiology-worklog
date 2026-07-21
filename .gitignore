@@ -3,3 +3,10 @@ __pycache__/
 *.pyc
 *.pyo
 .env
+
+# Runtime artifacts
+logs/
+backups/
+
+# Per-user editor settings
+.vscode/settings-*.json
