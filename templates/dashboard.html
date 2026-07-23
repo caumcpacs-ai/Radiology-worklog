@@ -32,6 +32,9 @@
 .date-badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:700;background:#e8f0fe;color:#1a73e8;margin-left:6px}
 .tab-btn .badge {margin-left:6px;font-size:10px;padding:2px 6px;vertical-align:middle}
 .checklist-scroll{max-height:350px;overflow-y:auto;border:1px solid #e0e0e0;border-radius:4px}
+.acc-header .btn-group{display:inline-flex;gap:4px;flex-wrap:wrap}
+.acc-header .btn-disabled{opacity:.4;pointer-events:none}
+.acc-header form{margin:0}
 .checklist-scroll th{position:sticky;top:0;background:#f0f4ff!important;z-index:2;box-shadow:inset 0 -1px 0 #e0e0e0}
 </style>
 
@@ -54,11 +57,62 @@
       <span class="badge badge-secondary">미작성</span>
     {% endif %}
     <span class="acc-spacer"></span>
-    {% if day.status in ('제출', '확정') %}
-      <a href="#" onclick="event.stopPropagation(); window.open('/print/{{ day.date_str }}', 'worklog_popup_{{ day.date_str }}', 'width=900,height=900,scrollbars=yes'); return false;" class="btn btn-secondary btn-sm">👁️ 보기</a>
-    {% else %}
-      <a href="/write?date={{ day.date_str }}" onclick="event.stopPropagation()" class="btn btn-primary btn-sm">✏️ 작성</a>
-    {% endif %}
+    <div class="btn-group" onclick="event.stopPropagation()">
+      {% if session.role == 'admin' %}
+        {% if day.status == '제출' %}
+          <button class="btn btn-sm btn-warning btn-disabled">수정</button>
+          <button class="btn btn-sm btn-danger" onclick="openRejectModal('{{ day.date_str }}','{{ day.submitted_by }}')">반려</button>
+          <form method="post" action="/worklog/confirm/{{ day.date_str }}" style="display:inline" onsubmit="return confirm('확정하시겠습니까?')">
+            <input type="hidden" name="next" value="/?date={{ base_date }}">
+            <button class="btn btn-sm btn-success">확정</button>
+          </form>
+          <a href="/print/{{ day.date_str }}" target="_blank" class="btn btn-sm btn-secondary">인쇄</a>
+        {% elif day.status == '확정' %}
+          <button class="btn btn-sm btn-warning btn-disabled">수정</button>
+          <form method="post" action="/worklog/unconfirm/{{ day.date_str }}" style="display:inline" onsubmit="return confirm('확정을 취소하고 제출 상태로 되돌리겠습니까?')">
+            <input type="hidden" name="next" value="/?date={{ base_date }}">
+            <button class="btn btn-sm btn-danger">취소</button>
+          </form>
+          <a href="/print/{{ day.date_str }}" target="_blank" class="btn btn-sm btn-secondary">인쇄</a>
+        {% elif day.status in ('반려', '회수', '저장') %}
+          <a href="/write?date={{ day.date_str }}" class="btn btn-sm btn-warning">수정</a>
+          <a href="/print/{{ day.date_str }}" target="_blank" class="btn btn-sm btn-secondary">인쇄</a>
+        {% else %}
+          <a href="/write?date={{ day.date_str }}" class="btn btn-sm btn-primary">작성</a>
+        {% endif %}
+      {% else %}
+        {% if day.status == '저장' %}
+          <a href="/write?date={{ day.date_str }}" class="btn btn-sm btn-warning">수정</a>
+          <form method="post" action="/worklog/submit/{{ day.date_str }}" style="display:inline" onsubmit="return confirm('제출하시겠습니까?')">
+            <input type="hidden" name="next" value="/?date={{ base_date }}">
+            <button class="btn btn-sm btn-primary">제출</button>
+          </form>
+        {% elif day.status == '제출' %}
+          <button class="btn btn-sm btn-warning btn-disabled">수정</button>
+          <form method="post" action="/worklog/withdraw/{{ day.date_str }}" style="display:inline" onsubmit="return confirm('회수하시겠습니까?')">
+            <input type="hidden" name="next" value="/?date={{ base_date }}">
+            <button class="btn btn-sm btn-warning">회수</button>
+          </form>
+          <a href="/print/{{ day.date_str }}" target="_blank" class="btn btn-sm btn-secondary">인쇄</a>
+        {% elif day.status == '확정' %}
+          <button class="btn btn-sm btn-warning btn-disabled">수정</button>
+          <button class="btn btn-sm btn-success btn-disabled">확정</button>
+          <a href="/print/{{ day.date_str }}" target="_blank" class="btn btn-sm btn-secondary">인쇄</a>
+        {% elif day.status == '반려' %}
+          <a href="/write?date={{ day.date_str }}" class="btn btn-sm btn-warning">수정</a>
+          <form method="post" action="/worklog/submit/{{ day.date_str }}" style="display:inline" onsubmit="return confirm('재제출하시겠습니까?')">
+            <input type="hidden" name="next" value="/?date={{ base_date }}">
+            <button class="btn btn-sm btn-primary">재제출</button>
+          </form>
+          <button class="btn btn-sm btn-success btn-disabled">확정</button>
+          <a href="/print/{{ day.date_str }}" target="_blank" class="btn btn-sm btn-secondary">인쇄</a>
+        {% elif day.status == '회수' %}
+          <a href="/write?date={{ day.date_str }}" class="btn btn-sm btn-warning">수정</a>
+        {% else %}
+          <a href="/write?date={{ day.date_str }}" class="btn btn-sm btn-primary">작성</a>
+        {% endif %}
+      {% endif %}
+    </div>
   </div>
   <div class="acc-body">
   {% if day.schedules %}
@@ -235,9 +289,48 @@
 </div>
 {% endfor %}
 
+<!-- 반려 모달 (관리자) -->
+{% if session.role == 'admin' %}
+<div id="rejectModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:500;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:8px;padding:24px;width:360px;box-shadow:0 4px 20px rgba(0,0,0,.2)">
+    <h3 style="margin-bottom:16px;font-size:15px">반려 처리</h3>
+    <form method="post" id="rejectForm">
+      <input type="hidden" name="next" value="/?date={{ base_date }}">
+      <div class="form-group">
+        <label>반려 대상 (사용자)</label>
+        <select name="target_user" style="width:100%">
+          {% for u in users %}
+          <option value="{{ u.username }}">{{ u.name }} ({{ u.username }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+        <button type="button" class="btn btn-secondary" onclick="closeRejectModal()">취소</button>
+        <button type="submit" class="btn btn-danger">반려</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
 <script>
 function toggleAcc(idx) {
   document.getElementById('acc-' + idx).classList.toggle('open');
+}
+function openRejectModal(date, submittedBy) {
+  var form = document.getElementById('rejectForm');
+  if (!form) return;
+  form.action = '/worklog/reject/' + date;
+  var modal = document.getElementById('rejectModal');
+  modal.style.display = 'flex';
+  var sel = modal.querySelector('select[name=target_user]');
+  for (var i = 0; i < sel.options.length; i++) {
+    if (sel.options[i].value === submittedBy) { sel.selectedIndex = i; break; }
+  }
+}
+function closeRejectModal() {
+  var modal = document.getElementById('rejectModal');
+  if (modal) modal.style.display = 'none';
 }
 </script>
 {% endblock %}

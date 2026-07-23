@@ -709,8 +709,9 @@ def dashboard():
             })
 
         # 8. 제출 상태 조회
-        ws = conn.execute("SELECT status FROM worklog_status WHERE date=?", (dt,)).fetchone()
+        ws = conn.execute("SELECT status, submitted_by FROM worklog_status WHERE date=?", (dt,)).fetchone()
         status = ws['status'] if ws else None
+        submitted_by = ws['submitted_by'] if ws else ''
 
         status_class_map = {
             '제출': 'info',
@@ -740,6 +741,7 @@ def dashboard():
             'weekday': weekday,
             'status': status,
             'status_class': status_class,
+            'submitted_by': submitted_by,
             'roster_grouped': roster_grouped_sorted,
             'vacation': vacation,
             'oncall': oncall,
@@ -750,10 +752,16 @@ def dashboard():
             'schedules': schedules
         })
 
+    # 반려 모달 대상 사용자 목록 (관리자만)
+    if session.get('role') == 'admin':
+        users = conn.execute("SELECT username, name FROM users ORDER BY name").fetchall()
+    else:
+        users = []
+
     conn.close()
     cal_conn.close()
 
-    return render_template('dashboard.html', days=days_data, base_date=base_date.isoformat())
+    return render_template('dashboard.html', days=days_data, base_date=base_date.isoformat(), users=users)
 
 
 # ════════════════════════════════════════════════════
@@ -1242,6 +1250,12 @@ def worklog_save(date_str):
     return redirect(url_for('write', date=date_str))
 
 
+def _back(default='worklog_list'):
+    """액션 후 복귀. 폼의 next(상대경로)가 있으면 그쪽으로, 없으면 기본 페이지로."""
+    nxt = request.form.get('next')
+    return redirect(nxt if nxt and nxt.startswith('/') else url_for(default))
+
+
 @app.route('/worklog/submit/<date_str>', methods=['POST'])
 @login_required
 def worklog_submit(date_str):
@@ -1253,7 +1267,7 @@ def worklog_submit(date_str):
         (date_str, session['user'], now))
     conn.commit(); conn.close()
     flash(f'{date_str} 업무일지가 제출되었습니다.', 'success')
-    return redirect(url_for('worklog_list'))
+    return _back()
 
 
 @app.route('/worklog/withdraw/<date_str>', methods=['POST'])
@@ -1266,7 +1280,7 @@ def worklog_withdraw(date_str):
         conn.commit()
         flash(f'{date_str} 업무일지가 회수되어 저장 상태로 변경되었습니다.', 'info')
     conn.close()
-    return redirect(url_for('worklog_list'))
+    return _back()
 
 
 @app.route('/worklog/reject/<date_str>', methods=['POST'])
@@ -1282,7 +1296,7 @@ def worklog_reject(date_str):
         (session['name'], target_user, now, date_str))
     conn.commit(); conn.close()
     flash(f'{date_str} 업무일지가 반려되었습니다.', 'warning')
-    return redirect(url_for('worklog_list'))
+    return _back()
 
 
 @app.route('/worklog/confirm/<date_str>', methods=['POST'])
@@ -1296,7 +1310,7 @@ def worklog_confirm(date_str):
         (session['name'], now, date_str))
     conn.commit(); conn.close()
     flash(f'{date_str} 업무일지가 확정되었습니다.', 'success')
-    return redirect(url_for('worklog_list'))
+    return _back()
 
 
 @app.route('/worklog/unconfirm/<date_str>', methods=['POST'])
@@ -1309,7 +1323,7 @@ def worklog_unconfirm(date_str):
         (date_str,))
     conn.commit(); conn.close()
     flash(f'{date_str} 업무일지 확정이 취소되었습니다.', 'info')
-    return redirect(url_for('worklog_list'))
+    return _back()
 
 
 # ════════════════════════════════════════════════════
