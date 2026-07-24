@@ -476,13 +476,13 @@ On-call 항목을 파트, 성명, 전화받은 시각, 사유 기준으로 개�
 
 💾 데이터 백업 
 
-instance/worklog.db 파일을 복사하면 전체 데이터가 백업됩니다. 
+instance/ 폴더의 DB 파일을 복사하면 전체 데이터가 백업됩니다. (worklog.db 외에 calendar.db, radiation_device.db, special_equipment.db, maintenance.db 포함) 
 
 자동 백업 (매일 08:00) 
 
-backup_db.py 스크립트가 SQLite 온라인 백업 API를 사용해 앱 실행 중에도 안전하게 백업합니다. 
+backup_db.py 스크립트가 instance/ 폴더의 모든 파일을 백업합니다. .db 파일은 SQLite 온라인 백업 API를 사용해 앱 실행 중에도 안전하게 백업하고, 그 외 파일은 그대로 복사합니다. 
 
-백업 파일은 backups/worklog_YYYY-MM-DD.db 형태로 저장되며, 30일이 지난 백업은 자동 삭제됩니다 (backup_db.py의 KEEP_DAYS로 조정). 
+백업 파일은 backups/<원본이름>_YYYY-MM-DD.db 형태(예: worklog_2026-07-24.db, calendar_2026-07-24.db)로 날짜별로 계속 누적됩니다. 자동 삭제하지 않으므로 backups 폴더 용량이 계속 증가합니다. 
 
 성공/실패 내역은 backups/backup.log에 기록됩니다. 
 

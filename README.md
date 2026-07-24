@@ -213,11 +213,11 @@ radiology_worklog/
 ---
 
 ## 💾 데이터 백업
-`instance/worklog.db` 파일을 복사하면 전체 데이터가 백업됩니다.
+`instance/` 폴더의 DB 파일을 복사하면 전체 데이터가 백업됩니다. (`worklog.db` 외에 `calendar.db`, `radiation_device.db`, `special_equipment.db`, `maintenance.db` 포함)
 
 ### 자동 백업 (매일 08:00)
-- `backup_db.py` 스크립트가 SQLite 온라인 백업 API를 사용하므로 **앱 실행 중에도 안전하게** 백업됩니다.
-- 백업 파일: `backups/worklog_YYYY-MM-DD.db` (30일 경과분은 자동 삭제, `KEEP_DAYS`로 조정)
+- `backup_db.py` 스크립트가 `instance/` 폴더의 **모든 파일**을 백업합니다. `.db`는 SQLite 온라인 백업 API로 **앱 실행 중에도 안전하게**, 그 외 파일은 그대로 복사.
+- 백업 파일: `backups/<원본이름>_YYYY-MM-DD.db` (예: `worklog_2026-07-24.db`, `calendar_2026-07-24.db`) — 날짜별로 **계속 누적**되며 자동 삭제하지 않음 (backups 폴더 용량 증가에 유의)
 - 실행 로그: `backups/backup.log`
 - Windows 작업 스케줄러에 `RadiologyWorklog_DB_Backup` 작업으로 등록되어 매일 08:00 실행 (08:00에 PC가 꺼져 있었다면 켜진 후 자동 실행)
 
