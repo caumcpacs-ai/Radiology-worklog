@@ -15,6 +15,9 @@ app = Flask(__name__)
 
 app.secret_key = os.environ.get('SECRET_KEY', 'caumc-radiology-2024-!@#internal')
 
+# 20분 무활동 시 세션 만료 (요청마다 만료 시간 갱신 = 슬라이딩 방식)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=20)
+
 # ── 로그 설정 (날짜별 파일) ──
 _LOG_DIR = os.path.join(os.path.dirname(__file__), 'logs')
 os.makedirs(_LOG_DIR, exist_ok=True)
@@ -573,6 +576,7 @@ def login():
                             (username, password)).fetchone()
         conn.close()
         if user:
+            session.permanent = True
             session['user'] = username
             session['name'] = user['name']
             session['role'] = user['role']

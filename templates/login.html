@@ -22,10 +22,12 @@ button:hover{background:#1558b0}
 </head>
 <body>
 <div class="login-box">
-  <div class="logo">
-    <span class="icon">🏥</span>
-    <h1>영상의학과 업무일지</h1>
-    <p>Radiology Department Work Log</p>
+      <div class="logo">
+    <div style="font-size:13px;color:#556b82;font-weight:500;margin-bottom:2px;text-align:center;">중앙대학교 병원</div>
+    <h1 style="font-size:19px;font-weight:700;color:#1e2a3a;margin-bottom:14px;text-align:center;">영상의학과 업무일지</h1>
+    <div style="display:flex;justify-content:center;margin-bottom:6px;">
+      <img src="{{ url_for('static', filename='cau_logo_light_bg.png') }}" alt="중앙대학교병원" style="height:38px;width:auto;">
+    </div>
   </div>
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% for cat, msg in messages %}
